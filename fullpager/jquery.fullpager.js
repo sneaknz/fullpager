@@ -46,7 +46,8 @@
 				o.container.append('<p class="fp-pagination"><a href="#" class="fp-prev">'+o.prevText+'</a><a href="#" class="fp-next">'+o.nextText+'</a></p>');
 			}
 
-			o.imgBlocks = o.pages.filter('.fp-image-bg');
+			o.imgBlocks = o.pages.filter('[data-img]');
+			o.long = o.pages.filter('[data-long]');
 			o.next = o.container.find('.fp-next');
 			o.prev = o.container.find('.fp-prev');
 			
@@ -134,16 +135,20 @@
 			// Add background colours
 			o.pages.each(function() {
 				var bg = $(this).data('background');
-				console.log(bg);
 				if (bg) {
 					$(this).css('background-color', bg);
 				}
 			});
 			
 			// Set up fullscreen image backgrounds and blurs
+			o.long.addClass('fp-long');
+
+			// Set up fullscreen image backgrounds and blurs
 			o.imgBlocks.each(function() {
 				var $block = $(this),
 					src = $block.data('img');
+				
+					$block.addClass('fp-image-bg');
 				
 				if ( src !== null ) {
 					$block.imagefill({
@@ -300,14 +305,24 @@
 			o.pages.each(function() {
 				var $page = $(this);
 				
-				nav += '<li data-id="' + $page.attr('id') + '"><a href="#' + $page.attr('id') + '">' + $page.data('title') + '</a></li>';
+				if ( !$page.data('hide-nav') ) {
+					nav += '<li data-id="' + $page.attr('id') + '"><a href="#' + $page.attr('id') + '">' + $page.data('title') + '</a></li>';
+				}
 			})
 			
 			nav += '</ul></nav>';
 			
-			o.container.find('.fp-header').append(nav);
+			var $header = o.container.find('.fp-header');
 			
-			o.nav = o.container.find('.fp-nav');
+			if ($header.length) {
+				$header.append(nav);
+			} else {
+				$header = $('<div class="fp-header"></div>');
+				$header.append(nav);
+				o.container.prepend($header);
+			}
+			
+			o.nav = $header.find('.fp-nav');
 
 			o.nav.find('a').on('click', function(e){
 				if (Modernizr.touch) {

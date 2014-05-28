@@ -1,4 +1,4 @@
-// @codekit-append "../dist/jquery.fullpager.js";
+// @codekit-append "../fullpager/jquery.fullpager.js";
 
 // @codekit-append "../js/modernizr.js";
 // @codekit-append "../js/imagesloaded.js";

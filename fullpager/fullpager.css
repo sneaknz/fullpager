@@ -1,3 +1,6 @@
+html {
+  height: 100%;
+}
 .fp-container {
   position: relative;
   width: 100%;
@@ -100,7 +103,7 @@
 .fp-last-page-active .fp-next {
   opacity: 0.6;
 }
-.fp-long-page {
+.fp-long {
   min-height: 100%;
   height: auto !important;
 }

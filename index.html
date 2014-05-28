@@ -8,12 +8,12 @@
 	<meta charset="utf-8" />
 	<title>Fullpager plugin</title>
 
-	<link href="css/screen.css" rel="stylesheet" />
+	<link href="example/screen.css" rel="stylesheet" />
 	<script src="js/jquery-1.11.0.js"></script>
 
 	<!-- Plugin files and setup below -->
-	<link href="css/imagefill.css" rel="stylesheet" />
-	<link href="dist/fullpager.css" rel="stylesheet" />
+	<link href="fullpager/imagefill.css" rel="stylesheet" />
+	<link href="fullpager/fullpager.css" rel="stylesheet" />
 
 <!--
 	<script src="js/modernizr.js"></script>
@@ -23,10 +23,10 @@
 	<script src="js/jquery.easing.1.3.js"></script>
 	<script src="js/jquery.scrollTo.js"></script>
 	<script src="js/jquery.lazyload.js"></script>
-	<script src="dist/jquery.fullpager.js"></script>
+	<script src="fullpager/jquery.fullpager.js"></script>
 -->
 
-	<script src="dist/jquery.fullpager-combined.js"></script>
+	<script src="fullpager/jquery.fullpager-combined.js"></script>
 	
 	<script>
 		$(function(){
@@ -48,7 +48,7 @@
 		</section>
 	</div>
 
-	<div id="one" class="fp-page fp-image-bg" data-title="Image background" data-img="img/forrest-1600x800.jpg">
+	<div id="one" class="fp-page" data-title="Image background" data-image="example/forrest-1600x800.jpg">
 		<section class="fp-content">
 			<h1>With a full bleed image background</h1>
 		</section>
@@ -60,7 +60,7 @@
 		</section>
 	</div>
 
-	<div id="four" class="fp-page fp-long-page fp-content-section" data-title="Long-form content" data-background="#678">
+	<div id="four" class="fp-page" data-title="Long-form content" data-long="true" data-background="#678">
 		<section class="fp-content">
 			<h1>Long-form content</h1>
 			<p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
@@ -72,7 +72,7 @@
 		</section>
 	</div>
 
-	<div id="three" class="fp-page fp-image-bg" data-title="Image background 2" data-img="img/water-1600x800.jpg">
+	<div id="three" class="fp-page" data-title="Image background 2" data-image="example/water-1600x800.jpg">
 		<section class="fp-content">
 			<h1>Another with a full bleed image background</h1>
 		</section>
