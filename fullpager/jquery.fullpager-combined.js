@@ -61,7 +61,7 @@
 				o.container.append('<p class="fp-pagination"><a href="#" class="fp-prev">'+o.prevText+'</a><a href="#" class="fp-next">'+o.nextText+'</a></p>');
 			}
 
-			o.imgBlocks = o.pages.filter('[data-img]');
+			o.imgBlocks = o.pages.filter('[data-image]');
 			o.long = o.pages.filter('[data-long]');
 			o.next = o.container.find('.fp-next');
 			o.prev = o.container.find('.fp-prev');

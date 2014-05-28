@@ -9,20 +9,22 @@ After including jQuery, add the necessary required files for the plugin. This th
 	<link href="fullpager/imagefill.css" rel="stylesheet" />
 	<link href="fullpager/fullpager.css" rel="stylesheet" />
 
-	<script src="js/modernizr.js"></script>
-	<script src="js/imagesloaded.js"></script>
-	<script src="js/jquery.imagefill.js"></script>
-	<script src="js/isInViewport.js"></script>
-	<script src="js/jquery.easing.1.3.js"></script>
-	<script src="js/jquery.scrollTo.js"></script>
-	<script src="js/jquery.lazyload.js"></script>
-	<script src="fullpager/jquery.fullpager.js"></script>
+	<script src="modernizr.js"></script>
+	<script src="imagesloaded.js"></script>
+	<script src="jquery.imagefill.js"></script>
+	<script src="isInViewport.js"></script>
+	<script src="jquery.easing.1.3.js"></script>
+	<script src="jquery.scrollTo.js"></script>
+	<script src="jquery.lazyload.js"></script>
+
+	<script src="jquery.fullpager.js"></script>
 	
 Or if you are using the combined script that bundles all these plugins together:
 
-	<link href="fullpager/imagefill.css" rel="stylesheet" />
-	<link href="fullpager/fullpager.css" rel="stylesheet" />
-	<script src="fullpager/jquery.fullpager-combined.js"></script>
+	<link href="imagefill.css" rel="stylesheet" />
+	<link href="fullpager.css" rel="stylesheet" />
+
+	<script src="jquery.fullpager-combined.js"></script>
 	
 The following HTML structure is used to set up the pages. Note that the body is used here as the overall container, but in theory you can also next the 'fp-page' items within another block element and use that as the base container. The 'fp-header' element is optional, and will be created automatically to contain the nav if left out, however you may want to include this so you can style a logo or other header elements etc.
 
@@ -36,7 +38,7 @@ The following HTML structure is used to set up the pages. Note that the body is 
 			</section>
 		</div>
 
-		<div id="one" class="fp-page fp-image-bg" data-title="Image background" data-img="example/forrest-1600x800.jpg">
+		<div id="one" class="fp-page" data-title="Image background" data-image="example/forrest-1600x800.jpg">
 			<section class="fp-content">
 				...
 			</section>
@@ -48,13 +50,13 @@ The following HTML structure is used to set up the pages. Note that the body is 
 			</section>
 		</div>
 
-		<div id="four" class="fp-page fp-long-page fp-content-section" data-title="Long-form content" data-background="#678">
+		<div id="four" class="fp-page" data-title="Long-form content" data-long="true" data-background="#678">
 			<section class="fp-content">
 				...
 			</section>
 		</div>
 
-		<div id="three" class="fp-page fp-image-bg" data-title="Image background 2" data-img="example/water-1600x800.jpg">
+		<div id="three" class="fp-page" data-title="Image background 2" data-image="example/water-1600x800.jpg">
 			<section class="fp-content">
 				...
 			</section>
