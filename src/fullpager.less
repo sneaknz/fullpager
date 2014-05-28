@@ -1,0 +1,158 @@
+// Mixins
+// Transitions
+.transition (@transition) {
+	-webkit-transition: @transition;
+	   -moz-transition: @transition;
+ 	    -ms-transition: @transition;
+	     -o-transition: @transition;
+	        transition: @transition;
+}
+
+// Box sizing
+.box-sizing(@declaration: border-box) {
+	-webkit-box-sizing: @declaration;
+	-moz-box-sizing: @declaration;
+	-ms-box-sizing: border-box;    
+	box-sizing: @declaration;
+}
+
+// Border Radius
+.border-radius(@radius: 5px) {
+  -webkit-border-radius: @radius;
+	 -moz-border-radius: @radius;
+		  border-radius: @radius;
+}
+
+// Layout
+.fp-container {
+	position: relative;
+	width: 100%;
+	height: 100%;
+}
+
+.fp-header {
+	background: rgba(20, 24, 28, 0.9);
+	position: fixed;
+	z-index: 1;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 50px;
+	
+	ul, ol, li, p {
+		margin: 0;
+	}
+	
+	li, p {
+		line-height: 50px;
+	}
+	
+	a {
+		color: #ddd;
+		text-decoration: none;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+		
+		&:hover {
+			color: #fff;
+			border-color: rgba(255, 255, 255, 0.6);
+		}
+	}
+}
+
+.fp-nav {
+	ul {
+		text-align: center;
+	}
+	
+	li {
+		display: inline-block;
+		margin: 0 5px;
+	}
+	
+	.active a { opacity: 0.6; }
+}
+
+.fp-page {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	padding: 0;
+
+	/* Requires modernizr */
+	.touch & {
+		margin-bottom: 200px;
+	}
+}
+
+.fp-image-bg {
+	> img {
+		width: 100%;
+		position: absolute;
+		top: 0;
+		left: 0;
+		z-index: -1;
+		display: block;
+	}
+	
+	.delayed-image-load {
+		width: 100%;
+		height: 100%;
+	}
+	
+	.spinner {
+		position: absolute;
+		left: 50%;
+		top: 40%;
+	}
+}
+
+.fp-content {
+	position: relative;
+	margin: 0 auto;
+	.box-sizing();
+}
+
+.fp-pagination {
+	position: fixed;
+	top: 0;
+	right: 10px;
+	line-height: 50px;
+	z-index: 2;
+	
+	a {
+		margin-left: 10px;
+		.box-sizing();
+	
+		.touch & {
+			display: none;
+		}
+	}
+}
+
+.fp-first-page-active {
+	.fp-prev { opacity: 0.6; }
+}
+
+.fp-last-page-active {
+	.fp-next { opacity: 0.6; }
+}
+
+.fp-long-page {
+	min-height: 100%;
+	height: auto !important;
+}
+
+.fp-header,
+.fp-pagination {
+	a {
+		color: #ddd;
+		text-decoration: none;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+	}
+
+	a:hover {
+		color: #fff;
+		border-color: rgba(255, 255, 255, 0.6);
+	}
+}
