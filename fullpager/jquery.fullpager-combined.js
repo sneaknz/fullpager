@@ -31,8 +31,12 @@
  * 
  * OPTIONS
  * 
- * nextText		: The text for the 'next' page link. Defaults to 'Next'
- * prevText		: The text for the 'next' page link. Defaults to 'Prev'
+ * pagination	: Boolean. Whether to show prev/next links. Defaults to true
+ * nextText		: String. The text for the 'next' page link. Defaults to 'Next'
+ * prevText		: String. The text for the 'next' page link. Defaults to 'Prev'
+ * onScroll		: Callback. Called on scroll, when an update to check what page is in view is done. Defaults to null.
+ * 				: In the context of the callback, 'this' is the full object containing options and objects. 
+ * 				: Console.log the 'this' value to see what it contains.
  * 
  * USAGE
  * 
@@ -57,14 +61,17 @@
 			var hash = location.hash;
 			
 			// Add next/prev nav
-			if ( o.pages.length > 1 ) {
+			if ( o.pages.length > 1 && o.pagination ) {
 				o.container.append('<p class="fp-pagination"><a href="#" class="fp-prev">'+o.prevText+'</a><a href="#" class="fp-next">'+o.nextText+'</a></p>');
 			}
 
 			o.imgBlocks = o.pages.filter('[data-image]');
 			o.long = o.pages.filter('[data-long]');
-			o.next = o.container.find('.fp-next');
-			o.prev = o.container.find('.fp-prev');
+			
+			if ( o.pagination ) {
+				o.next = o.container.find('.fp-next');
+				o.prev = o.container.find('.fp-prev');
+			}
 			
 			fp.setupNav(o);
 			
@@ -107,18 +114,20 @@
 			});
 
 			// Prev/Next arrows
-			o.next.on('click', function(e){
-				e.preventDefault();
-				var id = fp.calculateId(o, 1);
-				fp.move(o, id);
-			});
+			if ( o.pagination ) {
+				o.next.on('click', function(e){
+					e.preventDefault();
+					var id = fp.calculateId(o, 1);
+					fp.move(o, id);
+				});
 			
-			o.prev.on('click', function(e){
-				e.preventDefault();
-				var id = fp.calculateId(o, -1);
-				fp.move(o, id);
-			});
-			
+				o.prev.on('click', function(e){
+					e.preventDefault();
+					var id = fp.calculateId(o, -1);
+					fp.move(o, id);
+				});
+			}
+					
 			fp.updateArrows(o);
 			
 			// Checks for whether a page is in the viewport
@@ -160,9 +169,10 @@
 
 			// Set up fullscreen image backgrounds and blurs
 			o.imgBlocks.each(function() {
-				var $block = $(this),
-					src = $block.data('img');
 				
+				var $block = $(this),
+					src = $block.data('image');
+					
 					$block.addClass('fp-image-bg');
 				
 				if ( src !== null ) {
@@ -191,15 +201,20 @@
 				var $content = $(this),
 					$contentParent = $content.closest('.fp-page');
 			
-				// Reset top value
+				// Reset values before checking sizes
+				$contentParent.removeClass('fp-long');
 				$content.css('top', 'auto');
 			
 				var ch = $content.outerHeight(true),
 					parentHeight = $contentParent.outerHeight(true),
 					existingPadding = parentHeight - $contentParent.innerHeight(),
 					offset = ((parentHeight - ch) / 2) - existingPadding;
-				
-				$content.css('top', offset + 'px');
+					
+				if ( ch >= parentHeight ){
+					$contentParent.addClass('fp-long');
+				} else {
+					$content.css('top', offset + 'px');
+				}
 			});
 		},
 		
@@ -212,6 +227,9 @@
 					}
 				}
 			});
+			if ( typeof o.onScroll === 'function' ) {
+				o.onScroll.call(o);
+			}
 		},
 		
 		getIndexFromHash: function(o, hash) {
@@ -252,22 +270,24 @@
 		},
 		
 		updateArrows: function(o) {
-			var pos = o.pages.index(o.$current);
-			if (pos === 0) {
-				// First page, so hide 'prev' arrow
-				o.container
-					.addClass('fp-first-page-active')
-					.removeClass('fp-last-page-active');
-			} else if (pos === o.pages.length - 1) {
-				// Last page, so hide 'next' arrow
-				o.container
-					.addClass('fp-last-page-active')
-					.removeClass('fp-first-page-active');
-			} else {
-				// Show the whole goddamn lot
-				o.container
-					.removeClass('fp-last-page-active')
-					.removeClass('fp-first-page-active');
+			if ( o.pagination ) {
+				var pos = o.pages.index(o.$current);
+				if (pos === 0) {
+					// First page, so hide 'prev' arrow
+					o.container
+						.addClass('fp-first-page-active')
+						.removeClass('fp-last-page-active');
+				} else if (pos === o.pages.length - 1) {
+					// Last page, so hide 'next' arrow
+					o.container
+						.addClass('fp-last-page-active')
+						.removeClass('fp-first-page-active');
+				} else {
+					// Show the whole goddamn lot
+					o.container
+						.removeClass('fp-last-page-active')
+						.removeClass('fp-first-page-active');
+				}
 			}
 		},
 	
@@ -320,8 +340,9 @@
 			o.pages.each(function() {
 				var $page = $(this);
 				
-				if ( !$page.data('hide-nav') ) {
-					nav += '<li data-id="' + $page.attr('id') + '"><a href="#' + $page.attr('id') + '">' + $page.data('title') + '</a></li>';
+				if ( $page.data('title') ) {
+					// Note space left at end of <li>'s to enable use of justified list layouts
+					nav += '<li data-id="' + $page.attr('id') + '"><a href="#' + $page.attr('id') + '">' + $page.data('title') + '</a></li> ';
 				}
 			});
 			
@@ -362,7 +383,7 @@
 			
 			o.container = $(this);
 			o.pages = o.container.find('.fp-page');
-			o.win = $('window');
+			o.win = $(window);
 			
 			o.container.addClass('fp-container');
 			
@@ -376,8 +397,10 @@
 	
 	$.fn.fullpager.defaults = {
 		pages: [],
+		pagination: true,
 		nextText: 'Next',
-		prevText: 'Prev'
+		prevText: 'Prev',
+		onScroll: null
 	};
 
 })(jQuery);

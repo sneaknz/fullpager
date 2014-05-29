@@ -44,13 +44,13 @@ The following HTML structure is used to set up the pages. Note that the body is 
 			</section>
 		</div>
 
-		<div id="two" class="fp-page" data-title="Custom Background Colour" data-background="#456" data-hide-nav="true">
+		<div id="two" class="fp-page" data-background="#456">
 			<section class="fp-content">
 				...
 			</section>
 		</div>
 
-		<div id="four" class="fp-page" data-title="Long-form content" data-long="true" data-background="#678">
+		<div id="four" class="fp-page" data-title="Long-form content" data-background="#678">
 			<section class="fp-content">
 				...
 			</section>
@@ -81,12 +81,20 @@ There are two places you can specify options. The first is when you call the plu
 
 <table>
 	<tr>
+		<th>pagination</th>
+		<td>Boolean. Whether to show prev/next links. Defaults to true.</td>
+	</tr>
+	<tr>
 		<th>nextText</th>
-		<td>The text to be shown for the 'next' page link label</td>
+		<td>String. The text for the 'next' page link. Defaults to 'Next'</td>
 	</tr>
 	<tr>
 		<th>prevText</th>
-		<td>The text to be shown for the 'previous' page link label</td>
+		<td>String. The text for the 'next' page link. Defaults to 'Prev'</td>
+	</tr>
+	<tr>
+		<th>onScroll</th>
+		<td>Callback. Optional, called on scroll when an update to check what page is in view is done. In the context of the callback, 'this' is the full object containing options and objects. Console.log the 'this' value to see what it contains.</td>
 	</tr>
 </table>
 
@@ -103,7 +111,7 @@ The second is by adding attributes to individual Page elements.
 		<th>data-title</th>
 		<td>Required</td>
 		<td>string</td>
-		<td>The title that will be used in navigation.</td>
+		<td>The title that will be used in navigation. If this is not included then the page will not be shown in the nav.</td>
 	</tr>
 	<tr>
 		<th>data-background</th>
@@ -116,18 +124,6 @@ The second is by adding attributes to individual Page elements.
 		<td>Optional</td>
 		<td>string</td>
 		<td>The URL to an image that will be used as the background for the page. The image will automatically scale to fill the entire background.</td>
-	</tr>
-	<tr>
-		<th>data-hide-nav</th>
-		<td>Optional</td>
-		<td>boolean</td>
-		<td>Use this to hide a page from the navigation.</td>
-	</tr>
-	<tr>
-		<th>data-long</th>
-		<td>Optional</td>
-		<td>boolean</td>
-		<td>For content that will likely be longer than the browser height. This will allow the page block to be taller than the browser window. In future this will automatically be set, but for now it's manual.</td>
 	</tr>
 </table>
 
