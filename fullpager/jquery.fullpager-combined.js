@@ -16,7 +16,7 @@
 /*!
  * Fullpager
  * Mike Harding (@sneak)
- * v1.0.0
+ * v1.0.1
  * 
  * Plugin to create full-screen paged content, as seen on http://letterboxd.com/2013/
  * 
