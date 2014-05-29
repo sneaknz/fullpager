@@ -323,7 +323,7 @@
 				if ( !$page.data('hide-nav') ) {
 					nav += '<li data-id="' + $page.attr('id') + '"><a href="#' + $page.attr('id') + '">' + $page.data('title') + '</a></li>';
 				}
-			})
+			});
 			
 			nav += '</ul></nav>';
 			
@@ -340,16 +340,14 @@
 			o.nav = $header.find('.fp-nav');
 
 			o.nav.find('a').on('click', function(e){
+				e.preventDefault();
+				
+				var $this = $(this),
+					id = $this.parent('li').data('id');
+				
 				if (Modernizr.touch) {
-					var $this = $(this),
-						id = $this.parent('li').data('id');
-						
 					fp.updateMenu(o, id);
 				} else {
-					e.preventDefault();
-					var $this = $(this),
-						id = $this.parent('li').data('id');
-
 					fp.move(o, id);
 				}
 			});
