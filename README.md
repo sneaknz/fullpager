@@ -1,6 +1,6 @@
 # Fullpager plugin
 
-A plugin to create full-screen paged content, as seen on <a href="http://letterboxd.com/2013/">the Letterboxd Year In Review</a>.
+A plugin to create full-screen vertically paged content. <a href="http://code.sneak.co.nz/fullpager/">http://code.sneak.co.nz/fullpager/</a>.
 
 ## Usage
 
@@ -133,5 +133,5 @@ The second is on the page elements themselves, in the form of attributes:
 
 ## To-do
 
-— Update to use debounced resize
+- Update to use debounced resize
 - Remove dependencies on other plugins
