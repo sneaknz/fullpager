@@ -1,148 +1,168 @@
 /*!
  * Fullpager
  * Mike Harding (@sneak)
- * v1.0.1
+ * v1.2.0
  * 
- * Plugin to create full-screen paged content, as seen on http://letterboxd.com/2013/
- * 
- * REQUIRES
- * 				modernizr.js
- * 				imagesloaded.js
- * 				jquery.imagefill.js
- * 				isInViewport.js
- * 				jquery.easing.1.3.js
- * 				jquery.scrollTo.js
- * 				jquery.lazyload.js
- * 
- * OPTIONS
- * 
- * pagination	: Boolean. Whether to show prev/next links. Defaults to true
- * nextText		: String. The text for the 'next' page link. Defaults to 'Next'
- * prevText		: String. The text for the 'next' page link. Defaults to 'Prev'
- * onScroll		: Callback. Called on scroll, when an update to check what page is in view is done. Defaults to null.
- * 				: In the context of the callback, 'this' is the full object containing options and objects. 
- * 				: Console.log the 'this' value to see what it contains.
- * 
- * USAGE
- * 
- * $('body').fullpager();
- * $('.container').fullpager({
- * 		nextText: 'Next page',
- * 		prevText: 'Previous page'
- * });
+ * Plugin to create full-screen verticlly paged content.
+ * http://code.sneak.co.nz/fullpager/
  * 
  * @preserve
  */
 
-(function($) {
+;(function($) {
+
+	// Setup and utilities
+	var namespace = 'fullpager';
+	var logError = typeof console === 'undefined' ? function() {} : function( message ) { console.error( message ); };
 	
-	var fp = {
-		onResize: function(c,t){
-			onresize=function(){clearTimeout(t);t=setTimeout(c,100);};return c;
+	// Custom easing
+	$.easing.easeOutQuart = function (x, t, b, c, d) {
+		return -c * ((t=t/d-1)*t*t*t - 1) + b;
+	};
+	
+	var Fullpager = function(element, options) {
+		this.$el = $( element );
+		this.options = $.extend( true, {}, this.defaults, options );
+		this._init();
+	};
+	
+	Fullpager.prototype = {
+		defaults: {
+			pageSelector: '.fp-page',
+			pagination: true,
+			nextText: 'Next',
+			prevText: 'Prev',
+			onScroll: null,
+			onPageChange: null,
+			activeClass: 'active',
+			duration: 600
 		},
 		
-		init: function(o){
+		_init: function() {
+			var me = this;
+			
+			me.$el.addClass('fp-container');
+			me.$window = $(window);
+			me.$document = $(document);
+			me.$pages = me.$el.find(me.options.pageSelector);
+			me.touch = me._touchEnabled();
+			
+			if ( me.$pages.length === 0 ) {
+				// No pages passed in
+				logError('No pages exist for the ' + me.options.pageSelector + ' selector.');
+				return;
+			}
+			
+			me._navigation();
+			
 			// Set initial position if a hash exists
 			var hash = location.hash;
 			
-			// Add next/prev nav
-			if ( o.pages.length > 1 && o.pagination ) {
-				o.container.append('<p class="fp-pagination"><a href="#" class="fp-prev">'+o.prevText+'</a><a href="#" class="fp-next">'+o.nextText+'</a></p>');
-			}
-
-			o.imgBlocks = o.pages.filter('[data-image]');
-			o.long = o.pages.filter('[data-long]');
-			
-			if ( o.pagination ) {
-				o.next = o.container.find('.fp-next');
-				o.prev = o.container.find('.fp-prev');
-			}
-			
-			fp.setupNav(o);
-			
 			if (hash.length) {
 				var h = hash.slice(1);
-				o.current = h;
-				o.$current = o.pages.filter('#'+h).eq(0);
-				fp.move(o, h);
+				me.move(h);
 			} else {
-				o.$current = o.pages.eq(0);
-				o.current = o.$current.attr('id');
+				me.move( me.$pages.eq(0).attr('id') );
 			}
 			
-			// J/K and arrow navigation
-			$(document).keydown(function(e) {
-				if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) {
-					return;
+			me._bindings();
+			me._checkIfInView();
+			me._layout();
+			me.refresh();
+		},
+		
+		_navigation: function() {
+			var me = this;
+			
+			// Add next/prev nav
+			if ( me.$pages.length > 1 && me.options.pagination ) {
+				me.$el.append('<p class="fp-pagination"><a href="#" class="fp-prev">' + me.options.prevText + '</a><a href="#" class="fp-next">' + me.options.nextText + '</a></p>');
+				
+				me.$next = me.$el.find('.fp-next');
+				me.$prev = me.$el.find('.fp-prev');
+				
+				me.$next.on('click', function(e){
+					e.preventDefault();
+					var id = me._calculateId(1);
+					me.move(id);
+				});
+			
+				me.$prev.on('click', function(e){
+					e.preventDefault();
+					var id = me._calculateId(-1);
+					me.move(id);
+				});
+			}		
+			
+			// Add main navigation
+			var nav = '<nav class="fp-nav"><ul>'; // Start the string
+			
+			me.$pages.each(function() {
+				var $page = $(this);
+				
+				if ( $page.data('title') && $page.attr('id') ) {
+					// Note space left at end of <li>'s to enable use of justified list layouts
+					nav += '<li data-id="' + $page.attr('id') + '"><a href="#' + $page.attr('id') + '">' + $page.data('title') + '</a></li> ';
+				}
+			});
+			
+			nav += '</ul></nav>'; // End string
+			
+			var $header = me.$el.find('.fp-header');
+			
+			if ($header.length) {
+				$header.append(nav);
+			} else {
+				$header = $('<div class="fp-header"></div>');
+				$header.append(nav);
+				me.$el.prepend($header);
+			}
+			me.$nav = $header.find('.fp-nav');
+
+			me.$nav.find('a').on('click', function(e){
+				e.preventDefault();
+				
+				var $this = $(this),
+					id = $this.parent('li').data('id');
+				
+				if (me.touch) {
+					me._updateNav(id);
 				} else {
-					switch(e.which) {
-						case 74: // j
-							fp.keypress(e, 1, o);
-						break;
-					
-						case 40: // down arrow
-							fp.keypress(e, 1, o);
-						break;
-
-						case 75: // k
-							fp.keypress(e, -1, o);
-						break;
-
-						case 38: // up arrow
-							fp.keypress(e, -1, o);
-						break;
-
-						default: return; // exit this handler for other keys
-					}
-					e.preventDefault();
+					me.move(id);
 				}
-			});
-
-			// Prev/Next arrows
-			if ( o.pagination ) {
-				o.next.on('click', function(e){
-					e.preventDefault();
-					var id = fp.calculateId(o, 1);
-					fp.move(o, id);
-				});
-			
-				o.prev.on('click', function(e){
-					e.preventDefault();
-					var id = fp.calculateId(o, -1);
-					fp.move(o, id);
-				});
-			}
-					
-			fp.updateArrows(o);
-			
-			// Checks for whether a page is in the viewport
-			var scrollTimer = null;
-
-			o.win.on('scroll', function() {
-				if ( scrollTimer ) {
-					clearTimeout(scrollTimer);
-				}
-				scrollTimer = setTimeout(fp.checkIfInView(o), 100);
-			});
-			
-			fp.checkIfInView(o);
-			
-			o.container.find("img.lazy").lazyload({
-				effect: "fadeIn",
-				threshold: o.lazyloadOffset
-			});
-			
-			fp.layout(o);
-			
-			fp.onResize(function(){
-				fp.doResize(o);
-				fp.centerContent(o);
 			});
 		},
 		
-		layout: function(o){
+		_bindings: function() {
+			var me = this;
+			
+			me._resizeDelegate = function() {
+				return me.refresh();
+			};
+			
+			me._keydownDelegate = function(ev) {
+				return me._keydown(ev);
+			};
+			
+			me._scrollDelegate = function(ev) {
+				return me._scroll(ev);
+			};
+			
+			me.$window.on('resize.' + namespace, me._resizeDelegate);
+			me.$window.trigger('resize');
+
+			me.$document.on('keydown.' + namespace, me._keydownDelegate);
+			
+			// Checks for whether a page is in the viewport
+			me.scrollTimer = null;
+			me.$window.on('scroll.' + namespace, me._scrollDelegate);
+		},
+		
+		_layout: function() {
+			var me = this;
+			
 			// Add background colours
-			o.pages.each(function() {
+			me.$pages.each(function() {
 				var bg = $(this).data('background');
 				if (bg) {
 					$(this).css('background-color', bg);
@@ -150,39 +170,184 @@
 			});
 			
 			// Set up fullscreen image backgrounds and blurs
-			o.long.addClass('fp-long');
-
-			// Set up fullscreen image backgrounds and blurs
-			o.imgBlocks.each(function() {
+			me.$pages.filter('[data-image]').each(function() {
 				
-				var $block = $(this),
-					src = $block.data('image');
+				// First check if imagefill plugin exists
+				if ( $.fn.imagefill ) {
+					var $block = $(this),
+						src = $block.data('image');
 					
 					$block.addClass('fp-image-bg');
 				
-				if ( src !== null ) {
-					$block.imagefill({
-						images: [src]
-					});
+					if ( src !== null ) {
+						$block.imagefill({
+							images: [src]
+						});
+					}
+				} else {
+					logError('The imagefill plugin must be included if you want to use full bleed background images. http://code.sneak.co.nz/imagefill/');
 				}
 			});
-			
-			// Set up content blocks
-			fp.centerContent(o);
 		},
 		
-		scaleImage: function(o, img, w, h) {
-			if ((h/w) > o.imgRatio){
-				img.height(h);
-				img.width(h / o.imgRatio);
+		move: function(id) {
+			var me = this;
+			
+			if (me.current === id) {
+				// Already selected
+				return;
 			} else {
-				img.width(w);
-				img.height(w * o.imgRatio);
+				var $newPage = me.$pages.filter('#'+id).eq(0);
+			
+				if (history.pushState) {
+					history.pushState(null, null, '#'+id);
+				} else {
+					window.location.hash = id;
+				}
+
+				me.animating = true;
+
+				$.scrollTo.window().stop(true); // Cancel any exisitng scrolling first to avoid queuing
+				
+				$.scrollTo( $newPage, {
+					duration: me.options.duration,
+					easing: 'easeOutQuart',
+					onAfter: function(){
+						me.animating = false;
+					}
+				});
+				
+				me._setCurrent(id);
 			}
 		},
 		
-		centerContent: function(o) {
-			o.pages.find('.fp-content').each(function() {
+		_updateNav: function(id) {
+			var me = this;
+			var $li = me.$nav.find('li');
+			
+			$li.removeClass(me.options.activeClass).filter('[data-id=' + id + ']').addClass(me.options.activeClass);
+			
+			// Update prev/next
+			if ( me.pagination ) {
+				var pos = me.$pages.index(me.$current);
+				if (pos === 0) {
+					// First page, so hide 'prev' arrow
+					me.$el.addClass('fp-first-page-active').removeClass('fp-last-page-active');
+				} else if (pos === me.$pages.length - 1) {
+					// Last page, so hide 'next' arrow
+					me.$el.addClass('fp-last-page-active').removeClass('fp-first-page-active');
+				} else {
+					// Show the whole goddamn lot
+					me.$el.removeClass('fp-last-page-active').removeClass('fp-first-page-active');
+				}
+			}
+		},
+		
+		_setCurrent: function(id) {
+			var me = this;
+			
+			if (me.current !== id) {
+				me.$current = me.$pages.filter('#'+id).eq(0);
+				me.current = id;
+				me._updateNav(id);
+				
+				if ( typeof me.options.onPageChange === 'function' ) {
+					me.options.onPageChange.call(me);
+				}
+			}
+		},
+		
+		_calculateId: function(offset) {
+			var me = this;
+			
+			var pos = me.$pages.index(me.$current),
+				id = me.current;
+				
+			if ( ((pos === 0 && offset === -1) || (pos === me.$pages.length - 1 && offset === 1)) ) {
+				// Can't navigate from here, so leave the same
+			} else {
+				var $targetPage = me.$pages.eq(pos += offset);
+				id = $targetPage.attr('id');
+			}
+			
+			return id;
+		},
+		
+		_keydown: function(ev) {
+			var me = this;
+			
+			// J/K and arrow navigation
+
+			if (ev.altKey || ev.ctrlKey || ev.shiftKey || ev.metaKey) {
+				return;
+			} else {
+				switch(ev.which) {
+					case 74: // j
+						me._keypress(ev, 1);
+					break;
+			
+					case 40: // down arrow
+						me._keypress(ev, 1);
+					break;
+
+					case 75: // k
+						me._keypress(ev, -1);
+					break;
+
+					case 38: // up arrow
+						me._keypress(ev, -1);
+					break;
+
+					default: return; // exit this handler for other keys
+				}
+				ev.preventDefault();
+			}
+		},
+		
+		_keypress: function(e, direction) {
+			var me = this;
+			
+			if (e.target.tagName.toLowerCase() === 'input' ||
+				e.target.tagName.toLowerCase() === 'button' ||
+				e.target.tagName.toLowerCase() === 'select' ||
+				e.target.tagName.toLowerCase() === 'textarea') {
+					return;
+				}
+			
+			e.preventDefault();
+			var id = me._calculateId(direction);
+			me.move(id);
+		},
+		
+		_scroll: function() {
+			var me = this;
+			
+			if ( me.scrollTimer ) {
+				clearTimeout(me.scrollTimer);
+			}
+			me.scrollTimer = setTimeout(me._checkIfInView(), 100);
+		},
+		
+		_checkIfInView: function() {
+			var me = this;
+			
+			me.$pages.each(function(){
+				if ( $(this).isInViewport({ tolerance: 300 }) ) {
+					if (!me.animating) {
+						me._setCurrent( $(this).attr('id') );
+					}
+				}
+			});
+			
+			if ( typeof me.options.onScroll === 'function' ) {
+				me.options.onScroll.call(me);
+			}
+		},
+		
+		_centerContent: function() {
+			var me = this;
+			
+			me.$pages.find('.fp-content').each(function() {
 				var $content = $(this),
 					$contentParent = $content.closest('.fp-page');
 			
@@ -203,189 +368,96 @@
 			});
 		},
 		
-		checkIfInView: function(o) {
-			o.pages.each(function(){
-				if ( $(this).isInViewport({ tolerance: 300 }) ) {
-					if (!o.animating) {
-						fp.updateMenu(o, $(this).attr('id'));
-						fp.updateArrows(o);
-					}
-				}
-			});
-			if ( typeof o.onScroll === 'function' ) {
-				o.onScroll.call(o);
-			}
-		},
-		
-		getIndexFromHash: function(o, hash) {
-			var s = o.pages.filter('#'+hash).eq(0);
-			return o.pages.index(s);
-		},
-		
-		move: function(o, id) {
-			if (o.current === id) {
-				// Already selected
-				return;
-			} else {
-				var $newPage = o.pages.filter('#'+id).eq(0);
-					// index = fp.getIndexFromHash(o, id);
+		refresh: function() {
+			var me = this;
 			
-				o.current = id;
-				o.$current =$newPage;
-				
-				if (history.pushState) {
-					history.pushState(null, null, '#'+id);
-				} else {
-					window.location.hash = id;
-				}
-
-				o.animating = true;
-				$.scrollTo.window().stop(true); // Cancel any exisitng scrolling first to avoid queuing
-				$.scrollTo( $newPage, {
-					duration: 600,
-					easing: 'easeOutQuart',
-					onAfter: function(){
-						o.animating = false;
-					}
-				});
-				
-				fp.updateMenu(o, id);
-				fp.updateArrows(o);
-			}
-		},
+			me.viewportWidth = me.$window.width();
+			me.viewportHeight = me.$window.height();
 		
-		updateArrows: function(o) {
-			if ( o.pagination ) {
-				var pos = o.pages.index(o.$current);
-				if (pos === 0) {
-					// First page, so hide 'prev' arrow
-					o.container
-						.addClass('fp-first-page-active')
-						.removeClass('fp-last-page-active');
-				} else if (pos === o.pages.length - 1) {
-					// Last page, so hide 'next' arrow
-					o.container
-						.addClass('fp-last-page-active')
-						.removeClass('fp-first-page-active');
-				} else {
-					// Show the whole goddamn lot
-					o.container
-						.removeClass('fp-last-page-active')
-						.removeClass('fp-first-page-active');
-				}
-			}
-		},
-	
-		doResize: function(o) {
-			o.viewportWidth = o.win.width();
-			o.viewportHeight = o.win.height();
+			me._centerContent();
 			
-			$.scrollTo(o.$current, {
+			$.scrollTo(me.$current, {
 				duration: 600,
 				easing: 'easeOutQuart'
 			});
 		},
 		
-		updateMenu: function(o, id) {
-			o.nav.find('[data-id=' + id + ']').addClass('active').siblings().removeClass('active');
-			o.current = id;
-			o.$current = o.pages.filter('#'+id);
+		destroy: function() {
+			var me = this;
+			
+			// Remove stuff
+			me.$window.off('resize.' + namespace, me._resizeDelegate);
+			me.$document.off('keydown.' + namespace, me._keydownDelegate);
+			me.$window.off('scroll.' + namespace, me._scrollDelegate);
+			me.$next.remove();
+			me.$prev.remove();
+			me.$nav.remove();
 		},
+		
+		_touchEnabled: function() {
+			 return (('ontouchstart' in window) || (navigator.MaxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0));
+		},
+		
+		_onResize: function(c,t){
+			onresize = function(){
+				clearTimeout(t);
+				t = setTimeout(c,100);
+			};
+			return c;
+		},
+		
+		option: function(opts) {
+			if ( $.isPlainObject( opts ) ) {
+				this.options = $.extend( true, this.options, opts );
+			}
+		}
+	};
 	
-		calculateId: function(o, offset) {
-			var pos = o.pages.index(o.$current),
-				id = o.current;
-				
-			if ( ((pos === 0 && offset === -1) || (pos === o.pages.length - 1 && offset === 1)) ) {
-				// Can't navigate from here, so leave the same
-			} else {
-				var $targetPage = o.pages.eq(pos += offset);
-				id = $targetPage.attr('id');
-			}
-			return id;
-		},
-		
-		keypress: function(e, direction, o) {
-			if (e.target.tagName.toLowerCase() === 'input' ||
-				e.target.tagName.toLowerCase() === 'button' ||
-				e.target.tagName.toLowerCase() === 'select' ||
-				e.target.tagName.toLowerCase() === 'textarea') {
-					return;
-				}
-			
-			e.preventDefault();
-			var id = fp.calculateId(o, direction);
-			fp.move(o, id);
-		},
-		
-		setupNav: function(o) {
-			
-			var nav = '<nav class="fp-nav"><ul>';
-			
-			o.pages.each(function() {
-				var $page = $(this);
-				
-				if ( $page.data('title') ) {
-					// Note space left at end of <li>'s to enable use of justified list layouts
-					nav += '<li data-id="' + $page.attr('id') + '"><a href="#' + $page.attr('id') + '">' + $page.data('title') + '</a></li> ';
-				}
-			});
-			
-			nav += '</ul></nav>';
-			
-			var $header = o.container.find('.fp-header');
-			
-			if ($header.length) {
-				$header.append(nav);
-			} else {
-				$header = $('<div class="fp-header"></div>');
-				$header.append(nav);
-				o.container.prepend($header);
-			}
-			
-			o.nav = $header.find('.fp-nav');
+	$.fn[namespace] = function( options ) {
+	
+		if ( typeof options === 'string' ) {
+			// call plugin method when first argument is a string
+			// get arguments for method
+			var args = Array.prototype.slice.call( arguments, 1 );
 
-			o.nav.find('a').on('click', function(e){
-				e.preventDefault();
-				
-				var $this = $(this),
-					id = $this.parent('li').data('id');
-				
-				if (Modernizr.touch) {
-					fp.updateMenu(o, id);
+			for ( var i=0, len = this.length; i < len; i++ ) {
+				var elem = this[i];
+				var instance = $.data( elem, namespace );
+				if ( !instance ) {
+					logError( "cannot call methods on " + namespace + " prior to initialization; " +
+					"attempted to call '" + options + "'" );
+					continue;
+				}
+				if ( !$.isFunction( instance[options] ) || options.charAt(0) === '_' ) {
+					logError( "no such method '" + options + "' for " + namespace + " instance" );
+					continue;
+				}
+
+				// trigger method with arguments
+				var returnValue = instance[ options ].apply( instance, args );
+
+				// break look and return first value if provided
+				if ( returnValue !== undefined ) {
+					return returnValue;
+				}
+			}
+			// return this if no return value
+			return this;
+		} else {
+			return this.each( function() {
+				var instance = $.data( this, namespace );
+				if ( instance ) {
+					// apply options & init
+					instance.option( options || {} );
+					instance._init();
 				} else {
-					fp.move(o, id);
+					// initialize new instance
+					instance = new Fullpager( this, options );
+					$.data( this, namespace, instance );
 				}
 			});
 		}
 	};
 	
-	$.fn.fullpager = function(options) {
-		var opts = $.extend({}, $.fn.fullpager.defaults, options);
-		
-		return this.each(function() {
-			var o = $.meta ? $.extend({}, opts, $(this).data()) : opts;
-			
-			o.container = $(this);
-			o.pages = o.container.find('.fp-page');
-			o.win = $(window);
-			
-			o.container.addClass('fp-container');
-			
-			if ( o.pages.length === 0 ) {
-				// No pages to use
-			} else {
-				fp.init(o);
-			}
-		});
-	};
-	
-	$.fn.fullpager.defaults = {
-		pages: [],
-		pagination: true,
-		nextText: 'Next',
-		prevText: 'Prev',
-		onScroll: null
-	};
 
 })(jQuery);

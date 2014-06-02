@@ -1,13 +1,9 @@
 // @codekit-append "../fullpager/jquery.fullpager.js";
 
-// @codekit-append "../js/modernizr.js";
 // @codekit-append "../js/imagesloaded.js";
 // @codekit-append "../js/jquery.imagefill.js";
 // @codekit-append "../js/isInViewport.js";
-// @codekit-append "../js/jquery.easing.1.3.js";
 // @codekit-append "../js/jquery.scrollTo.js";
-// @codekit-append "../js/jquery.lazyload.js";
-
 
 /* **********************************************
      Begin jquery.fullpager.js
@@ -16,148 +12,168 @@
 /*!
  * Fullpager
  * Mike Harding (@sneak)
- * v1.0.1
+ * v1.2.0
  * 
- * Plugin to create full-screen paged content, as seen on http://letterboxd.com/2013/
- * 
- * REQUIRES
- * 				modernizr.js
- * 				imagesloaded.js
- * 				jquery.imagefill.js
- * 				isInViewport.js
- * 				jquery.easing.1.3.js
- * 				jquery.scrollTo.js
- * 				jquery.lazyload.js
- * 
- * OPTIONS
- * 
- * pagination	: Boolean. Whether to show prev/next links. Defaults to true
- * nextText		: String. The text for the 'next' page link. Defaults to 'Next'
- * prevText		: String. The text for the 'next' page link. Defaults to 'Prev'
- * onScroll		: Callback. Called on scroll, when an update to check what page is in view is done. Defaults to null.
- * 				: In the context of the callback, 'this' is the full object containing options and objects. 
- * 				: Console.log the 'this' value to see what it contains.
- * 
- * USAGE
- * 
- * $('body').fullpager();
- * $('.container').fullpager({
- * 		nextText: 'Next page',
- * 		prevText: 'Previous page'
- * });
+ * Plugin to create full-screen verticlly paged content.
+ * http://code.sneak.co.nz/fullpager/
  * 
  * @preserve
  */
 
-(function($) {
+;(function($) {
+
+	// Setup and utilities
+	var namespace = 'fullpager';
+	var logError = typeof console === 'undefined' ? function() {} : function( message ) { console.error( message ); };
 	
-	var fp = {
-		onResize: function(c,t){
-			onresize=function(){clearTimeout(t);t=setTimeout(c,100);};return c;
+	// Custom easing
+	$.easing.easeOutQuart = function (x, t, b, c, d) {
+		return -c * ((t=t/d-1)*t*t*t - 1) + b;
+	};
+	
+	var Fullpager = function(element, options) {
+		this.$el = $( element );
+		this.options = $.extend( true, {}, this.defaults, options );
+		this._init();
+	};
+	
+	Fullpager.prototype = {
+		defaults: {
+			pageSelector: '.fp-page',
+			pagination: true,
+			nextText: 'Next',
+			prevText: 'Prev',
+			onScroll: null,
+			onPageChange: null,
+			activeClass: 'active',
+			duration: 600
 		},
 		
-		init: function(o){
+		_init: function() {
+			var me = this;
+			
+			me.$el.addClass('fp-container');
+			me.$window = $(window);
+			me.$document = $(document);
+			me.$pages = me.$el.find(me.options.pageSelector);
+			me.touch = me._touchEnabled();
+			
+			if ( me.$pages.length === 0 ) {
+				// No pages passed in
+				logError('No pages exist for the ' + me.options.pageSelector + ' selector.');
+				return;
+			}
+			
+			me._navigation();
+			
 			// Set initial position if a hash exists
 			var hash = location.hash;
 			
-			// Add next/prev nav
-			if ( o.pages.length > 1 && o.pagination ) {
-				o.container.append('<p class="fp-pagination"><a href="#" class="fp-prev">'+o.prevText+'</a><a href="#" class="fp-next">'+o.nextText+'</a></p>');
-			}
-
-			o.imgBlocks = o.pages.filter('[data-image]');
-			o.long = o.pages.filter('[data-long]');
-			
-			if ( o.pagination ) {
-				o.next = o.container.find('.fp-next');
-				o.prev = o.container.find('.fp-prev');
-			}
-			
-			fp.setupNav(o);
-			
 			if (hash.length) {
 				var h = hash.slice(1);
-				o.current = h;
-				o.$current = o.pages.filter('#'+h).eq(0);
-				fp.move(o, h);
+				me.move(h);
 			} else {
-				o.$current = o.pages.eq(0);
-				o.current = o.$current.attr('id');
+				me.move( me.$pages.eq(0).attr('id') );
 			}
 			
-			// J/K and arrow navigation
-			$(document).keydown(function(e) {
-				if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) {
-					return;
+			me._bindings();
+			me._checkIfInView();
+			me._layout();
+			me.refresh();
+		},
+		
+		_navigation: function() {
+			var me = this;
+			
+			// Add next/prev nav
+			if ( me.$pages.length > 1 && me.options.pagination ) {
+				me.$el.append('<p class="fp-pagination"><a href="#" class="fp-prev">' + me.options.prevText + '</a><a href="#" class="fp-next">' + me.options.nextText + '</a></p>');
+				
+				me.$next = me.$el.find('.fp-next');
+				me.$prev = me.$el.find('.fp-prev');
+				
+				me.$next.on('click', function(e){
+					e.preventDefault();
+					var id = me._calculateId(1);
+					me.move(id);
+				});
+			
+				me.$prev.on('click', function(e){
+					e.preventDefault();
+					var id = me._calculateId(-1);
+					me.move(id);
+				});
+			}		
+			
+			// Add main navigation
+			var nav = '<nav class="fp-nav"><ul>'; // Start the string
+			
+			me.$pages.each(function() {
+				var $page = $(this);
+				
+				if ( $page.data('title') && $page.attr('id') ) {
+					// Note space left at end of <li>'s to enable use of justified list layouts
+					nav += '<li data-id="' + $page.attr('id') + '"><a href="#' + $page.attr('id') + '">' + $page.data('title') + '</a></li> ';
+				}
+			});
+			
+			nav += '</ul></nav>'; // End string
+			
+			var $header = me.$el.find('.fp-header');
+			
+			if ($header.length) {
+				$header.append(nav);
+			} else {
+				$header = $('<div class="fp-header"></div>');
+				$header.append(nav);
+				me.$el.prepend($header);
+			}
+			me.$nav = $header.find('.fp-nav');
+
+			me.$nav.find('a').on('click', function(e){
+				e.preventDefault();
+				
+				var $this = $(this),
+					id = $this.parent('li').data('id');
+				
+				if (me.touch) {
+					me._updateNav(id);
 				} else {
-					switch(e.which) {
-						case 74: // j
-							fp.keypress(e, 1, o);
-						break;
-					
-						case 40: // down arrow
-							fp.keypress(e, 1, o);
-						break;
-
-						case 75: // k
-							fp.keypress(e, -1, o);
-						break;
-
-						case 38: // up arrow
-							fp.keypress(e, -1, o);
-						break;
-
-						default: return; // exit this handler for other keys
-					}
-					e.preventDefault();
+					me.move(id);
 				}
-			});
-
-			// Prev/Next arrows
-			if ( o.pagination ) {
-				o.next.on('click', function(e){
-					e.preventDefault();
-					var id = fp.calculateId(o, 1);
-					fp.move(o, id);
-				});
-			
-				o.prev.on('click', function(e){
-					e.preventDefault();
-					var id = fp.calculateId(o, -1);
-					fp.move(o, id);
-				});
-			}
-					
-			fp.updateArrows(o);
-			
-			// Checks for whether a page is in the viewport
-			var scrollTimer = null;
-
-			o.win.on('scroll', function() {
-				if ( scrollTimer ) {
-					clearTimeout(scrollTimer);
-				}
-				scrollTimer = setTimeout(fp.checkIfInView(o), 100);
-			});
-			
-			fp.checkIfInView(o);
-			
-			o.container.find("img.lazy").lazyload({
-				effect: "fadeIn",
-				threshold: o.lazyloadOffset
-			});
-			
-			fp.layout(o);
-			
-			fp.onResize(function(){
-				fp.doResize(o);
-				fp.centerContent(o);
 			});
 		},
 		
-		layout: function(o){
+		_bindings: function() {
+			var me = this;
+			
+			me._resizeDelegate = function() {
+				return me.refresh();
+			};
+			
+			me._keydownDelegate = function(ev) {
+				return me._keydown(ev);
+			};
+			
+			me._scrollDelegate = function(ev) {
+				return me._scroll(ev);
+			};
+			
+			me.$window.on('resize.' + namespace, me._resizeDelegate);
+			me.$window.trigger('resize');
+
+			me.$document.on('keydown.' + namespace, me._keydownDelegate);
+			
+			// Checks for whether a page is in the viewport
+			me.scrollTimer = null;
+			me.$window.on('scroll.' + namespace, me._scrollDelegate);
+		},
+		
+		_layout: function() {
+			var me = this;
+			
 			// Add background colours
-			o.pages.each(function() {
+			me.$pages.each(function() {
 				var bg = $(this).data('background');
 				if (bg) {
 					$(this).css('background-color', bg);
@@ -165,39 +181,184 @@
 			});
 			
 			// Set up fullscreen image backgrounds and blurs
-			o.long.addClass('fp-long');
-
-			// Set up fullscreen image backgrounds and blurs
-			o.imgBlocks.each(function() {
+			me.$pages.filter('[data-image]').each(function() {
 				
-				var $block = $(this),
-					src = $block.data('image');
+				// First check if imagefill plugin exists
+				if ( $.fn.imagefill ) {
+					var $block = $(this),
+						src = $block.data('image');
 					
 					$block.addClass('fp-image-bg');
 				
-				if ( src !== null ) {
-					$block.imagefill({
-						images: [src]
-					});
+					if ( src !== null ) {
+						$block.imagefill({
+							images: [src]
+						});
+					}
+				} else {
+					logError('The imagefill plugin must be included if you want to use full bleed background images. http://code.sneak.co.nz/imagefill/');
 				}
 			});
-			
-			// Set up content blocks
-			fp.centerContent(o);
 		},
 		
-		scaleImage: function(o, img, w, h) {
-			if ((h/w) > o.imgRatio){
-				img.height(h);
-				img.width(h / o.imgRatio);
+		move: function(id) {
+			var me = this;
+			
+			if (me.current === id) {
+				// Already selected
+				return;
 			} else {
-				img.width(w);
-				img.height(w * o.imgRatio);
+				var $newPage = me.$pages.filter('#'+id).eq(0);
+			
+				if (history.pushState) {
+					history.pushState(null, null, '#'+id);
+				} else {
+					window.location.hash = id;
+				}
+
+				me.animating = true;
+
+				$.scrollTo.window().stop(true); // Cancel any exisitng scrolling first to avoid queuing
+				
+				$.scrollTo( $newPage, {
+					duration: me.options.duration,
+					easing: 'easeOutQuart',
+					onAfter: function(){
+						me.animating = false;
+					}
+				});
+				
+				me._setCurrent(id);
 			}
 		},
 		
-		centerContent: function(o) {
-			o.pages.find('.fp-content').each(function() {
+		_updateNav: function(id) {
+			var me = this;
+			var $li = me.$nav.find('li');
+			
+			$li.removeClass(me.options.activeClass).filter('[data-id=' + id + ']').addClass(me.options.activeClass);
+			
+			// Update prev/next
+			if ( me.pagination ) {
+				var pos = me.$pages.index(me.$current);
+				if (pos === 0) {
+					// First page, so hide 'prev' arrow
+					me.$el.addClass('fp-first-page-active').removeClass('fp-last-page-active');
+				} else if (pos === me.$pages.length - 1) {
+					// Last page, so hide 'next' arrow
+					me.$el.addClass('fp-last-page-active').removeClass('fp-first-page-active');
+				} else {
+					// Show the whole goddamn lot
+					me.$el.removeClass('fp-last-page-active').removeClass('fp-first-page-active');
+				}
+			}
+		},
+		
+		_setCurrent: function(id) {
+			var me = this;
+			
+			if (me.current !== id) {
+				me.$current = me.$pages.filter('#'+id).eq(0);
+				me.current = id;
+				me._updateNav(id);
+				
+				if ( typeof me.options.onPageChange === 'function' ) {
+					me.options.onPageChange.call(me);
+				}
+			}
+		},
+		
+		_calculateId: function(offset) {
+			var me = this;
+			
+			var pos = me.$pages.index(me.$current),
+				id = me.current;
+				
+			if ( ((pos === 0 && offset === -1) || (pos === me.$pages.length - 1 && offset === 1)) ) {
+				// Can't navigate from here, so leave the same
+			} else {
+				var $targetPage = me.$pages.eq(pos += offset);
+				id = $targetPage.attr('id');
+			}
+			
+			return id;
+		},
+		
+		_keydown: function(ev) {
+			var me = this;
+			
+			// J/K and arrow navigation
+
+			if (ev.altKey || ev.ctrlKey || ev.shiftKey || ev.metaKey) {
+				return;
+			} else {
+				switch(ev.which) {
+					case 74: // j
+						me._keypress(ev, 1);
+					break;
+			
+					case 40: // down arrow
+						me._keypress(ev, 1);
+					break;
+
+					case 75: // k
+						me._keypress(ev, -1);
+					break;
+
+					case 38: // up arrow
+						me._keypress(ev, -1);
+					break;
+
+					default: return; // exit this handler for other keys
+				}
+				ev.preventDefault();
+			}
+		},
+		
+		_keypress: function(e, direction) {
+			var me = this;
+			
+			if (e.target.tagName.toLowerCase() === 'input' ||
+				e.target.tagName.toLowerCase() === 'button' ||
+				e.target.tagName.toLowerCase() === 'select' ||
+				e.target.tagName.toLowerCase() === 'textarea') {
+					return;
+				}
+			
+			e.preventDefault();
+			var id = me._calculateId(direction);
+			me.move(id);
+		},
+		
+		_scroll: function() {
+			var me = this;
+			
+			if ( me.scrollTimer ) {
+				clearTimeout(me.scrollTimer);
+			}
+			me.scrollTimer = setTimeout(me._checkIfInView(), 100);
+		},
+		
+		_checkIfInView: function() {
+			var me = this;
+			
+			me.$pages.each(function(){
+				if ( $(this).isInViewport({ tolerance: 300 }) ) {
+					if (!me.animating) {
+						me._setCurrent( $(this).attr('id') );
+					}
+				}
+			});
+			
+			if ( typeof me.options.onScroll === 'function' ) {
+				me.options.onScroll.call(me);
+			}
+		},
+		
+		_centerContent: function() {
+			var me = this;
+			
+			me.$pages.find('.fp-content').each(function() {
 				var $content = $(this),
 					$contentParent = $content.closest('.fp-page');
 			
@@ -218,1161 +379,99 @@
 			});
 		},
 		
-		checkIfInView: function(o) {
-			o.pages.each(function(){
-				if ( $(this).isInViewport({ tolerance: 300 }) ) {
-					if (!o.animating) {
-						fp.updateMenu(o, $(this).attr('id'));
-						fp.updateArrows(o);
-					}
-				}
-			});
-			if ( typeof o.onScroll === 'function' ) {
-				o.onScroll.call(o);
-			}
-		},
-		
-		getIndexFromHash: function(o, hash) {
-			var s = o.pages.filter('#'+hash).eq(0);
-			return o.pages.index(s);
-		},
-		
-		move: function(o, id) {
-			if (o.current === id) {
-				// Already selected
-				return;
-			} else {
-				var $newPage = o.pages.filter('#'+id).eq(0);
-					// index = fp.getIndexFromHash(o, id);
+		refresh: function() {
+			var me = this;
 			
-				o.current = id;
-				o.$current =$newPage;
-				
-				if (history.pushState) {
-					history.pushState(null, null, '#'+id);
-				} else {
-					window.location.hash = id;
-				}
-
-				o.animating = true;
-				$.scrollTo.window().stop(true); // Cancel any exisitng scrolling first to avoid queuing
-				$.scrollTo( $newPage, {
-					duration: 600,
-					easing: 'easeOutQuart',
-					onAfter: function(){
-						o.animating = false;
-					}
-				});
-				
-				fp.updateMenu(o, id);
-				fp.updateArrows(o);
-			}
-		},
+			me.viewportWidth = me.$window.width();
+			me.viewportHeight = me.$window.height();
 		
-		updateArrows: function(o) {
-			if ( o.pagination ) {
-				var pos = o.pages.index(o.$current);
-				if (pos === 0) {
-					// First page, so hide 'prev' arrow
-					o.container
-						.addClass('fp-first-page-active')
-						.removeClass('fp-last-page-active');
-				} else if (pos === o.pages.length - 1) {
-					// Last page, so hide 'next' arrow
-					o.container
-						.addClass('fp-last-page-active')
-						.removeClass('fp-first-page-active');
-				} else {
-					// Show the whole goddamn lot
-					o.container
-						.removeClass('fp-last-page-active')
-						.removeClass('fp-first-page-active');
-				}
-			}
-		},
-	
-		doResize: function(o) {
-			o.viewportWidth = o.win.width();
-			o.viewportHeight = o.win.height();
+			me._centerContent();
 			
-			$.scrollTo(o.$current, {
+			$.scrollTo(me.$current, {
 				duration: 600,
 				easing: 'easeOutQuart'
 			});
 		},
 		
-		updateMenu: function(o, id) {
-			o.nav.find('[data-id=' + id + ']').addClass('active').siblings().removeClass('active');
-			o.current = id;
-			o.$current = o.pages.filter('#'+id);
+		destroy: function() {
+			var me = this;
+			
+			// Remove stuff
+			me.$window.off('resize.' + namespace, me._resizeDelegate);
+			me.$document.off('keydown.' + namespace, me._keydownDelegate);
+			me.$window.off('scroll.' + namespace, me._scrollDelegate);
+			me.$next.remove();
+			me.$prev.remove();
+			me.$nav.remove();
 		},
+		
+		_touchEnabled: function() {
+			 return (('ontouchstart' in window) || (navigator.MaxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0));
+		},
+		
+		_onResize: function(c,t){
+			onresize = function(){
+				clearTimeout(t);
+				t = setTimeout(c,100);
+			};
+			return c;
+		},
+		
+		option: function(opts) {
+			if ( $.isPlainObject( opts ) ) {
+				this.options = $.extend( true, this.options, opts );
+			}
+		}
+	};
 	
-		calculateId: function(o, offset) {
-			var pos = o.pages.index(o.$current),
-				id = o.current;
-				
-			if ( ((pos === 0 && offset === -1) || (pos === o.pages.length - 1 && offset === 1)) ) {
-				// Can't navigate from here, so leave the same
-			} else {
-				var $targetPage = o.pages.eq(pos += offset);
-				id = $targetPage.attr('id');
-			}
-			return id;
-		},
-		
-		keypress: function(e, direction, o) {
-			if (e.target.tagName.toLowerCase() === 'input' ||
-				e.target.tagName.toLowerCase() === 'button' ||
-				e.target.tagName.toLowerCase() === 'select' ||
-				e.target.tagName.toLowerCase() === 'textarea') {
-					return;
-				}
-			
-			e.preventDefault();
-			var id = fp.calculateId(o, direction);
-			fp.move(o, id);
-		},
-		
-		setupNav: function(o) {
-			
-			var nav = '<nav class="fp-nav"><ul>';
-			
-			o.pages.each(function() {
-				var $page = $(this);
-				
-				if ( $page.data('title') ) {
-					// Note space left at end of <li>'s to enable use of justified list layouts
-					nav += '<li data-id="' + $page.attr('id') + '"><a href="#' + $page.attr('id') + '">' + $page.data('title') + '</a></li> ';
-				}
-			});
-			
-			nav += '</ul></nav>';
-			
-			var $header = o.container.find('.fp-header');
-			
-			if ($header.length) {
-				$header.append(nav);
-			} else {
-				$header = $('<div class="fp-header"></div>');
-				$header.append(nav);
-				o.container.prepend($header);
-			}
-			
-			o.nav = $header.find('.fp-nav');
+	$.fn[namespace] = function( options ) {
+	
+		if ( typeof options === 'string' ) {
+			// call plugin method when first argument is a string
+			// get arguments for method
+			var args = Array.prototype.slice.call( arguments, 1 );
 
-			o.nav.find('a').on('click', function(e){
-				e.preventDefault();
-				
-				var $this = $(this),
-					id = $this.parent('li').data('id');
-				
-				if (Modernizr.touch) {
-					fp.updateMenu(o, id);
+			for ( var i=0, len = this.length; i < len; i++ ) {
+				var elem = this[i];
+				var instance = $.data( elem, namespace );
+				if ( !instance ) {
+					logError( "cannot call methods on " + namespace + " prior to initialization; " +
+					"attempted to call '" + options + "'" );
+					continue;
+				}
+				if ( !$.isFunction( instance[options] ) || options.charAt(0) === '_' ) {
+					logError( "no such method '" + options + "' for " + namespace + " instance" );
+					continue;
+				}
+
+				// trigger method with arguments
+				var returnValue = instance[ options ].apply( instance, args );
+
+				// break look and return first value if provided
+				if ( returnValue !== undefined ) {
+					return returnValue;
+				}
+			}
+			// return this if no return value
+			return this;
+		} else {
+			return this.each( function() {
+				var instance = $.data( this, namespace );
+				if ( instance ) {
+					// apply options & init
+					instance.option( options || {} );
+					instance._init();
 				} else {
-					fp.move(o, id);
+					// initialize new instance
+					instance = new Fullpager( this, options );
+					$.data( this, namespace, instance );
 				}
 			});
 		}
 	};
 	
-	$.fn.fullpager = function(options) {
-		var opts = $.extend({}, $.fn.fullpager.defaults, options);
-		
-		return this.each(function() {
-			var o = $.meta ? $.extend({}, opts, $(this).data()) : opts;
-			
-			o.container = $(this);
-			o.pages = o.container.find('.fp-page');
-			o.win = $(window);
-			
-			o.container.addClass('fp-container');
-			
-			if ( o.pages.length === 0 ) {
-				// No pages to use
-			} else {
-				fp.init(o);
-			}
-		});
-	};
-	
-	$.fn.fullpager.defaults = {
-		pages: [],
-		pagination: true,
-		nextText: 'Next',
-		prevText: 'Prev',
-		onScroll: null
-	};
 
 })(jQuery);
-
-/* **********************************************
-     Begin modernizr.js
-********************************************** */
-
-/*!
- * Modernizr v1.7
- * http://www.modernizr.com
- *
- * Developed by: 
- * - Faruk Ates  http://farukat.es/
- * - Paul Irish  http://paulirish.com/
- *
- * Copyright (c) 2009-2011
- * Dual-licensed under the BSD or MIT licenses.
- * http://www.modernizr.com/license/
- */
-
- 
-/*
- * Modernizr is a script that detects native CSS3 and HTML5 features
- * available in the current UA and provides an object containing all
- * features with a true/false value, depending on whether the UA has
- * native support for it or not.
- * 
- * Modernizr will also add classes to the <html> element of the page,
- * one for each feature it detects. If the UA supports it, a class
- * like "cssgradients" will be added. If not, the class name will be
- * "no-cssgradients". This allows for simple if-conditionals in your
- * CSS, giving you fine control over the look & feel of your website.
- * 
- * @author        Faruk Ates
- * @author        Paul Irish
- * @copyright     (c) 2009-2011 Faruk Ates.
- * @contributor   Ben Alman
- */
-
-window.Modernizr = (function(window,document,undefined){
-    
-    var version = '1.7',
-
-    ret = {},
-
-    /**
-     * !! DEPRECATED !!
-     * 
-     * enableHTML5 is a private property for advanced use only. If enabled,
-     * it will make Modernizr.init() run through a brief while() loop in
-     * which it will create all HTML5 elements in the DOM to allow for
-     * styling them in Internet Explorer, which does not recognize any
-     * non-HTML4 elements unless created in the DOM this way.
-     * 
-     * enableHTML5 is ON by default.
-     * 
-     * The enableHTML5 toggle option is DEPRECATED as per 1.6, and will be
-     * replaced in 2.0 in lieu of the modular, configurable nature of 2.0.
-     */
-    enableHTML5 = true,
-    
-    
-    docElement = document.documentElement,
-    docHead = document.head || document.getElementsByTagName('head')[0],
-
-    /**
-     * Create our "modernizr" element that we do most feature tests on.
-     */
-    mod = 'modernizr',
-    modElem = document.createElement( mod ),
-    m_style = modElem.style,
-
-    /**
-     * Create the input element for various Web Forms feature tests.
-     */
-    inputElem = document.createElement( 'input' ),
-    
-    smile = ':)',
-    
-    tostring = Object.prototype.toString,
-    
-    // List of property values to set for css tests. See ticket #21
-    prefixes = ' -webkit- -moz- -o- -ms- -khtml- '.split(' '),
-
-    // Following spec is to expose vendor-specific style properties as:
-    //   elem.style.WebkitBorderRadius
-    // and the following would be incorrect:
-    //   elem.style.webkitBorderRadius
-    
-    // Webkit ghosts their properties in lowercase but Opera & Moz do not.
-    // Microsoft foregoes prefixes entirely <= IE8, but appears to 
-    //   use a lowercase `ms` instead of the correct `Ms` in IE9
-    
-    // More here: http://github.com/Modernizr/Modernizr/issues/issue/21
-    domPrefixes = 'Webkit Moz O ms Khtml'.split(' '),
-
-    ns = {'svg': 'http://www.w3.org/2000/svg'},
-
-    tests = {},
-    inputs = {},
-    attrs = {},
-    
-    classes = [],
-    
-    featurename, // used in testing loop
-    
-    
-    
-    // todo: consider using http://javascript.nwbox.com/CSSSupport/css-support.js instead
-    testMediaQuery = function(mq){
-
-      var st = document.createElement('style'),
-          div = document.createElement('div'),
-          ret;
-
-      st.textContent = mq + '{#modernizr{height:3px}}';
-      docHead.appendChild(st);
-      div.id = 'modernizr';
-      docElement.appendChild(div);
-
-      ret = div.offsetHeight === 3;
-
-      st.parentNode.removeChild(st);
-      div.parentNode.removeChild(div);
-
-      return !!ret;
-
-    },
-    
-    
-    /**
-      * isEventSupported determines if a given element supports the given event
-      * function from http://yura.thinkweb2.com/isEventSupported/
-      */
-    isEventSupported = (function(){
-
-      var TAGNAMES = {
-        'select':'input','change':'input',
-        'submit':'form','reset':'form',
-        'error':'img','load':'img','abort':'img'
-      };
-
-      function isEventSupported(eventName, element) {
-
-        element = element || document.createElement(TAGNAMES[eventName] || 'div');
-        eventName = 'on' + eventName;
-
-        // When using `setAttribute`, IE skips "unload", WebKit skips "unload" and "resize", whereas `in` "catches" those
-        var isSupported = (eventName in element);
-
-        if (!isSupported) {
-          // If it has no `setAttribute` (i.e. doesn't implement Node interface), try generic element
-          if (!element.setAttribute) {
-            element = document.createElement('div');
-          }
-          if (element.setAttribute && element.removeAttribute) {
-            element.setAttribute(eventName, '');
-            isSupported = is(element[eventName], 'function');
-
-            // If property was created, "remove it" (by setting value to `undefined`)
-            if (!is(element[eventName], undefined)) {
-              element[eventName] = undefined;
-            }
-            element.removeAttribute(eventName);
-          }
-        }
-
-        element = null;
-        return isSupported;
-      }
-      return isEventSupported;
-    })();
-    
-    
-    // hasOwnProperty shim by kangax needed for Safari 2.0 support
-    var _hasOwnProperty = ({}).hasOwnProperty, hasOwnProperty;
-    if (!is(_hasOwnProperty, undefined) && !is(_hasOwnProperty.call, undefined)) {
-      hasOwnProperty = function (object, property) {
-        return _hasOwnProperty.call(object, property);
-      };
-    }
-    else {
-      hasOwnProperty = function (object, property) { /* yes, this can give false positives/negatives, but most of the time we don't care about those */
-        return ((property in object) && is(object.constructor.prototype[property], undefined));
-      };
-    }
-    
-    /**
-     * set_css applies given styles to the Modernizr DOM node.
-     */
-    function set_css( str ) {
-        m_style.cssText = str;
-    }
-
-    /**
-     * set_css_all extrapolates all vendor-specific css strings.
-     */
-    function set_css_all( str1, str2 ) {
-        return set_css(prefixes.join(str1 + ';') + ( str2 || '' ));
-    }
-
-    /**
-     * is returns a boolean for if typeof obj is exactly type.
-     */
-    function is( obj, type ) {
-        return typeof obj === type;
-    }
-
-    /**
-     * contains returns a boolean for if substr is found within str.
-     */
-    function contains( str, substr ) {
-        return (''+str).indexOf( substr ) !== -1;
-    }
-
-    /**
-     * test_props is a generic CSS / DOM property test; if a browser supports
-     *   a certain property, it won't return undefined for it.
-     *   A supported CSS property returns empty string when its not yet set.
-     */
-    function test_props( props, callback ) {
-        for ( var i in props ) {
-            if ( m_style[ props[i] ] !== undefined && ( !callback || callback( props[i], modElem ) ) ) {
-                return true;
-            }
-        }
-    }
-
-    /**
-     * test_props_all tests a list of DOM properties we want to check against.
-     *   We specify literally ALL possible (known and/or likely) properties on 
-     *   the element including the non-vendor prefixed one, for forward-
-     *   compatibility.
-     */
-    function test_props_all( prop, callback ) {
-      
-        var uc_prop = prop.charAt(0).toUpperCase() + prop.substr(1),
-            props   = (prop + ' ' + domPrefixes.join(uc_prop + ' ') + uc_prop).split(' ');
-
-        return !!test_props( props, callback );
-    }
-    
-
-    /**
-     * Tests
-     * -----
-     */
-
-    tests['flexbox'] = function() {
-        /**
-         * set_prefixed_value_css sets the property of a specified element
-         * adding vendor prefixes to the VALUE of the property.
-         * @param {Element} element
-         * @param {string} property The property name. This will not be prefixed.
-         * @param {string} value The value of the property. This WILL be prefixed.
-         * @param {string=} extra Additional CSS to append unmodified to the end of
-         * the CSS string.
-         */
-        function set_prefixed_value_css(element, property, value, extra) {
-            property += ':';
-            element.style.cssText = (property + prefixes.join(value + ';' + property)).slice(0, -property.length) + (extra || '');
-        }
-
-        /**
-         * set_prefixed_property_css sets the property of a specified element
-         * adding vendor prefixes to the NAME of the property.
-         * @param {Element} element
-         * @param {string} property The property name. This WILL be prefixed.
-         * @param {string} value The value of the property. This will not be prefixed.
-         * @param {string=} extra Additional CSS to append unmodified to the end of
-         * the CSS string.
-         */
-        function set_prefixed_property_css(element, property, value, extra) {
-            element.style.cssText = prefixes.join(property + ':' + value + ';') + (extra || '');
-        }
-
-        var c = document.createElement('div'),
-            elem = document.createElement('div');
-
-        set_prefixed_value_css(c, 'display', 'box', 'width:42px;padding:0;');
-        set_prefixed_property_css(elem, 'box-flex', '1', 'width:10px;');
-
-        c.appendChild(elem);
-        docElement.appendChild(c);
-
-        var ret = elem.offsetWidth === 42;
-
-        c.removeChild(elem);
-        docElement.removeChild(c);
-
-        return ret;
-    };
-    
-    // On the S60 and BB Storm, getContext exists, but always returns undefined
-    // http://github.com/Modernizr/Modernizr/issues/issue/97/ 
-    
-    tests['canvas'] = function() {
-        var elem = document.createElement( 'canvas' );
-        return !!(elem.getContext && elem.getContext('2d'));
-    };
-    
-    tests['canvastext'] = function() {
-        return !!(ret['canvas'] && is(document.createElement( 'canvas' ).getContext('2d').fillText, 'function'));
-    };
-    
-    // This WebGL test false positives in FF depending on graphics hardware. But really it's quite impossible to know
-    // wether webgl will succeed until after you create the context. You might have hardware that can support
-    // a 100x100 webgl canvas, but will not support a 1000x1000 webgl canvas. So this feature inference is weak, 
-    // but intentionally so.
-    tests['webgl'] = function(){
-        return !!window.WebGLRenderingContext;
-    };
-    
-    /*
-     * The Modernizr.touch test only indicates if the browser supports
-     *    touch events, which does not necessarily reflect a touchscreen
-     *    device, as evidenced by tablets running Windows 7 or, alas,
-     *    the Palm Pre / WebOS (touch) phones.
-     *    
-     * Additionally, Chrome (desktop) used to lie about its support on this,
-     *    but that has since been rectified: http://crbug.com/36415
-     *    
-     * We also test for Firefox 4 Multitouch Support.
-     *
-     * For more info, see: http://modernizr.github.com/Modernizr/touch.html
-     */
-     
-    tests['touch'] = function() {
-
-        return ('ontouchstart' in window) || testMediaQuery('@media ('+prefixes.join('touch-enabled),(')+'modernizr)');
-
-    };
-
-
-    /**
-     * geolocation tests for the new Geolocation API specification.
-     *   This test is a standards compliant-only test; for more complete
-     *   testing, including a Google Gears fallback, please see:
-     *   http://code.google.com/p/geo-location-javascript/
-     * or view a fallback solution using google's geo API:
-     *   http://gist.github.com/366184
-     */
-    tests['geolocation'] = function() {
-        return !!navigator.geolocation;
-    };
-
-    // Per 1.6: 
-    // This used to be Modernizr.crosswindowmessaging but the longer
-    // name has been deprecated in favor of a shorter and property-matching one.
-    // The old API is still available in 1.6, but as of 2.0 will throw a warning,
-    // and in the first release thereafter disappear entirely.
-    tests['postmessage'] = function() {
-      return !!window.postMessage;
-    };
-
-    // Web SQL database detection is tricky:
-
-    // In chrome incognito mode, openDatabase is truthy, but using it will 
-    //   throw an exception: http://crbug.com/42380
-    // We can create a dummy database, but there is no way to delete it afterwards. 
-    
-    // Meanwhile, Safari users can get prompted on any database creation.
-    //   If they do, any page with Modernizr will give them a prompt:
-    //   http://github.com/Modernizr/Modernizr/issues/closed#issue/113
-    
-    // We have chosen to allow the Chrome incognito false positive, so that Modernizr
-    //   doesn't litter the web with these test databases. As a developer, you'll have
-    //   to account for this gotcha yourself.
-    tests['websqldatabase'] = function() {
-      var result = !!window.openDatabase;
-      /*  if (result){
-            try {
-              result = !!openDatabase( mod + "testdb", "1.0", mod + "testdb", 2e4);
-            } catch(e) {
-            }
-          }  */
-      return result;
-    };
-    
-    // Vendors have inconsistent prefixing with the experimental Indexed DB:
-    // - Firefox is shipping indexedDB in FF4 as moz_indexedDB
-    // - Webkit's implementation is accessible through webkitIndexedDB
-    // We test both styles.
-    tests['indexedDB'] = function(){
-      for (var i = -1, len = domPrefixes.length; ++i < len; ){ 
-        var prefix = domPrefixes[i].toLowerCase();
-        if (window[prefix + '_indexedDB'] || window[prefix + 'IndexedDB']){
-          return true;
-        } 
-      }
-      return false;
-    };
-
-    // documentMode logic from YUI to filter out IE8 Compat Mode
-    //   which false positives.
-    tests['hashchange'] = function() {
-      return isEventSupported('hashchange', window) && ( document.documentMode === undefined || document.documentMode > 7 );
-    };
-
-    // Per 1.6: 
-    // This used to be Modernizr.historymanagement but the longer
-    // name has been deprecated in favor of a shorter and property-matching one.
-    // The old API is still available in 1.6, but as of 2.0 will throw a warning,
-    // and in the first release thereafter disappear entirely.
-    tests['history'] = function() {
-      return !!(window.history && history.pushState);
-    };
-
-    tests['draganddrop'] = function() {
-        return isEventSupported('dragstart') && isEventSupported('drop');
-    };
-    
-    tests['websockets'] = function(){
-        return ('WebSocket' in window);
-    };
-    
-    
-    // http://css-tricks.com/rgba-browser-support/
-    tests['rgba'] = function() {
-        // Set an rgba() color and check the returned value
-        
-        set_css(  'background-color:rgba(150,255,150,.5)' );
-        
-        return contains( m_style.backgroundColor, 'rgba' );
-    };
-    
-    tests['hsla'] = function() {
-        // Same as rgba(), in fact, browsers re-map hsla() to rgba() internally,
-        //   except IE9 who retains it as hsla
-        
-        set_css('background-color:hsla(120,40%,100%,.5)' );
-        
-        return contains( m_style.backgroundColor, 'rgba' ) || contains( m_style.backgroundColor, 'hsla' );
-    };
-    
-    tests['multiplebgs'] = function() {
-        // Setting multiple images AND a color on the background shorthand property
-        //  and then querying the style.background property value for the number of
-        //  occurrences of "url(" is a reliable method for detecting ACTUAL support for this!
-        
-        set_css( 'background:url(//:),url(//:),red url(//:)' );
-        
-        // If the UA supports multiple backgrounds, there should be three occurrences
-        //   of the string "url(" in the return value for elem_style.background
-
-        return new RegExp("(url\\s*\\(.*?){3}").test(m_style.background);
-    };
-    
-    
-    // In testing support for a given CSS property, it's legit to test:
-    //    `elem.style[styleName] !== undefined`
-    // If the property is supported it will return an empty string,
-    // if unsupported it will return undefined.
-    
-    // We'll take advantage of this quick test and skip setting a style 
-    // on our modernizr element, but instead just testing undefined vs
-    // empty string.
-    
-
-    tests['backgroundsize'] = function() {
-        return test_props_all( 'backgroundSize' );
-    };
-    
-    tests['borderimage'] = function() {
-        return test_props_all( 'borderImage' );
-    };
-    
-    
-    // Super comprehensive table about all the unique implementations of 
-    // border-radius: http://muddledramblings.com/table-of-css3-border-radius-compliance
-    
-    tests['borderradius'] = function() {
-        return test_props_all( 'borderRadius', '', function( prop ) {
-            return contains( prop, 'orderRadius' );
-        });
-    };
-    
-    // WebOS unfortunately false positives on this test.
-    tests['boxshadow'] = function() {
-        return test_props_all( 'boxShadow' );
-    };
-    
-    // FF3.0 will false positive on this test 
-    tests['textshadow'] = function(){
-        return document.createElement('div').style.textShadow === '';
-    };
-    
-    
-    tests['opacity'] = function() {
-        // Browsers that actually have CSS Opacity implemented have done so
-        //  according to spec, which means their return values are within the
-        //  range of [0.0,1.0] - including the leading zero.
-        
-        set_css_all( 'opacity:.55' );
-        
-        // The non-literal . in this regex is intentional:
-        //   German Chrome returns this value as 0,55
-        // https://github.com/Modernizr/Modernizr/issues/#issue/59/comment/516632
-        return /^0.55$/.test(m_style.opacity);
-    };
-    
-    
-    tests['cssanimations'] = function() {
-        return test_props_all( 'animationName' );
-    };
-    
-    
-    tests['csscolumns'] = function() {
-        return test_props_all( 'columnCount' );
-    };
-    
-    
-    tests['cssgradients'] = function() {
-        /**
-         * For CSS Gradients syntax, please see:
-         * http://webkit.org/blog/175/introducing-css-gradients/
-         * https://developer.mozilla.org/en/CSS/-moz-linear-gradient
-         * https://developer.mozilla.org/en/CSS/-moz-radial-gradient
-         * http://dev.w3.org/csswg/css3-images/#gradients-
-         */
-        
-        var str1 = 'background-image:',
-            str2 = 'gradient(linear,left top,right bottom,from(#9f9),to(white));',
-            str3 = 'linear-gradient(left top,#9f9, white);';
-        
-        set_css(
-            (str1 + prefixes.join(str2 + str1) + prefixes.join(str3 + str1)).slice(0,-str1.length)
-        );
-        
-        return contains( m_style.backgroundImage, 'gradient' );
-    };
-    
-    
-    tests['cssreflections'] = function() {
-        return test_props_all( 'boxReflect' );
-    };
-    
-    
-    tests['csstransforms'] = function() {
-        return !!test_props([ 'transformProperty', 'WebkitTransform', 'MozTransform', 'OTransform', 'msTransform' ]);
-    };
-    
-    
-    tests['csstransforms3d'] = function() {
-        
-        var ret = !!test_props([ 'perspectiveProperty', 'WebkitPerspective', 'MozPerspective', 'OPerspective', 'msPerspective' ]);
-        
-        // Webkit’s 3D transforms are passed off to the browser's own graphics renderer.
-        //   It works fine in Safari on Leopard and Snow Leopard, but not in Chrome in
-        //   some conditions. As a result, Webkit typically recognizes the syntax but 
-        //   will sometimes throw a false positive, thus we must do a more thorough check:
-        if (ret && 'webkitPerspective' in docElement.style){
-          
-          // Webkit allows this media query to succeed only if the feature is enabled.    
-          // `@media (transform-3d),(-o-transform-3d),(-moz-transform-3d),(-ms-transform-3d),(-webkit-transform-3d),(modernizr){ ... }`    
-          ret = testMediaQuery('@media ('+prefixes.join('transform-3d),(')+'modernizr)');
-        }
-        return ret;
-    };
-    
-    
-    tests['csstransitions'] = function() {
-        return test_props_all( 'transitionProperty' );
-    };
-
-
-    // @font-face detection routine by Diego Perini
-    // http://javascript.nwbox.com/CSSSupport/
-    tests['fontface'] = function(){
-
-        var 
-        sheet, bool,
-        head = docHead || docElement,
-        style = document.createElement("style"),
-        impl = document.implementation || { hasFeature: function() { return false; } };
-        
-        style.type = 'text/css';
-        head.insertBefore(style, head.firstChild);
-        sheet = style.sheet || style.styleSheet;
-
-        var supportAtRule = impl.hasFeature('CSS2', '') ?
-                function(rule) {
-                    if (!(sheet && rule)) return false;
-                    var result = false;
-                    try {
-                        sheet.insertRule(rule, 0);
-                        result = (/src/i).test(sheet.cssRules[0].cssText);
-                        sheet.deleteRule(sheet.cssRules.length - 1);
-                    } catch(e) { }
-                    return result;
-                } :
-                function(rule) {
-                    if (!(sheet && rule)) return false;
-                    sheet.cssText = rule;
-                    
-                    return sheet.cssText.length !== 0 && (/src/i).test(sheet.cssText) &&
-                      sheet.cssText
-                            .replace(/\r+|\n+/g, '')
-                            .indexOf(rule.split(' ')[0]) === 0;
-                };
-        
-        bool = supportAtRule('@font-face { font-family: "font"; src: url(data:,); }');
-        head.removeChild(style);
-        return bool;
-    };
-    
-
-    // These tests evaluate support of the video/audio elements, as well as
-    // testing what types of content they support.
-    //
-    // We're using the Boolean constructor here, so that we can extend the value
-    // e.g.  Modernizr.video     // true
-    //       Modernizr.video.ogg // 'probably'
-    //
-    // Codec values from : http://github.com/NielsLeenheer/html5test/blob/9106a8/index.html#L845
-    //                     thx to NielsLeenheer and zcorpan
-    
-    // Note: in FF 3.5.1 and 3.5.0, "no" was a return value instead of empty string.
-    //   Modernizr does not normalize for that.
-    
-    tests['video'] = function() {
-        var elem = document.createElement('video'),
-            bool = !!elem.canPlayType;
-        
-        if (bool){  
-            bool      = new Boolean(bool);  
-            bool.ogg  = elem.canPlayType('video/ogg; codecs="theora"');
-            
-            // Workaround required for IE9, which doesn't report video support without audio codec specified.
-            //   bug 599718 @ msft connect
-            var h264 = 'video/mp4; codecs="avc1.42E01E';
-            bool.h264 = elem.canPlayType(h264 + '"') || elem.canPlayType(h264 + ', mp4a.40.2"');
-            
-            bool.webm = elem.canPlayType('video/webm; codecs="vp8, vorbis"');
-        }
-        return bool;
-    };
-    
-    tests['audio'] = function() {
-        var elem = document.createElement('audio'),
-            bool = !!elem.canPlayType;
-        
-        if (bool){  
-            bool      = new Boolean(bool);  
-            bool.ogg  = elem.canPlayType('audio/ogg; codecs="vorbis"');
-            bool.mp3  = elem.canPlayType('audio/mpeg;');
-            
-            // Mimetypes accepted: 
-            //   https://developer.mozilla.org/En/Media_formats_supported_by_the_audio_and_video_elements
-            //   http://bit.ly/iphoneoscodecs
-            bool.wav  = elem.canPlayType('audio/wav; codecs="1"');
-            bool.m4a  = elem.canPlayType('audio/x-m4a;') || elem.canPlayType('audio/aac;');
-        }
-        return bool;
-    };
-
-
-    // Firefox has made these tests rather unfun.
-
-    // In FF4, if disabled, window.localStorage should === null.
-
-    // Normally, we could not test that directly and need to do a 
-    //   `('localStorage' in window) && ` test first because otherwise Firefox will
-    //   throw http://bugzil.la/365772 if cookies are disabled
-
-    // However, in Firefox 4 betas, if dom.storage.enabled == false, just mentioning
-    //   the property will throw an exception. http://bugzil.la/599479
-    // This looks to be fixed for FF4 Final.
-
-    // Because we are forced to try/catch this, we'll go aggressive.
-
-    // FWIW: IE8 Compat mode supports these features completely:
-    //   http://www.quirksmode.org/dom/html5.html
-    // But IE8 doesn't support either with local files
-
-    tests['localstorage'] = function() {
-        try {
-            return !!localStorage.getItem;
-        } catch(e) {
-            return false;
-        }
-    };
-
-    tests['sessionstorage'] = function() {
-        try {
-            return !!sessionStorage.getItem;
-        } catch(e){
-            return false;
-        }
-    };
-
-
-    tests['webWorkers'] = function () {
-        return !!window.Worker;
-    };
-
-
-    tests['applicationcache'] =  function() {
-        return !!window.applicationCache;
-    };
-
- 
-    // Thanks to Erik Dahlstrom
-    tests['svg'] = function(){
-        return !!document.createElementNS && !!document.createElementNS(ns.svg, "svg").createSVGRect;
-    };
-
-    tests['inlinesvg'] = function() {
-      var div = document.createElement('div');
-      div.innerHTML = '<svg/>';
-      return (div.firstChild && div.firstChild.namespaceURI) == ns.svg;
-    };
-
-    // Thanks to F1lt3r and lucideer
-    // http://github.com/Modernizr/Modernizr/issues#issue/35
-    tests['smil'] = function(){
-        return !!document.createElementNS && /SVG/.test(tostring.call(document.createElementNS(ns.svg,'animate')));
-    };
-
-    tests['svgclippaths'] = function(){
-        // Possibly returns a false positive in Safari 3.2?
-        return !!document.createElementNS && /SVG/.test(tostring.call(document.createElementNS(ns.svg,'clipPath')));
-    };
-
-
-    // input features and input types go directly onto the ret object, bypassing the tests loop.
-    // Hold this guy to execute in a moment.
-    function webforms(){
-    
-        // Run through HTML5's new input attributes to see if the UA understands any.
-        // We're using f which is the <input> element created early on
-        // Mike Taylr has created a comprehensive resource for testing these attributes
-        //   when applied to all input types: 
-        //   http://miketaylr.com/code/input-type-attr.html
-        // spec: http://www.whatwg.org/specs/web-apps/current-work/multipage/the-input-element.html#input-type-attr-summary
-        ret['input'] = (function(props) {
-            for (var i = 0, len = props.length; i<len; i++) {
-                attrs[ props[i] ] = !!(props[i] in inputElem);
-            }
-            return attrs;
-        })('autocomplete autofocus list placeholder max min multiple pattern required step'.split(' '));
-
-        // Run through HTML5's new input types to see if the UA understands any.
-        //   This is put behind the tests runloop because it doesn't return a
-        //   true/false like all the other tests; instead, it returns an object
-        //   containing each input type with its corresponding true/false value 
-        
-        // Big thanks to @miketaylr for the html5 forms expertise. http://miketaylr.com/
-        ret['inputtypes'] = (function(props) {
-          
-            for (var i = 0, bool, inputElemType, defaultView, len=props.length; i < len; i++) {
-              
-                inputElem.setAttribute('type', inputElemType = props[i]);
-                bool = inputElem.type !== 'text';
-                
-                // We first check to see if the type we give it sticks.. 
-                // If the type does, we feed it a textual value, which shouldn't be valid.
-                // If the value doesn't stick, we know there's input sanitization which infers a custom UI
-                if (bool){  
-                  
-                    inputElem.value         = smile;
-                    inputElem.style.cssText = 'position:absolute;visibility:hidden;';
-     
-                    if (/^range$/.test(inputElemType) && inputElem.style.WebkitAppearance !== undefined){
-                      
-                      docElement.appendChild(inputElem);
-                      defaultView = document.defaultView;
-                      
-                      // Safari 2-4 allows the smiley as a value, despite making a slider
-                      bool =  defaultView.getComputedStyle && 
-                              defaultView.getComputedStyle(inputElem, null).WebkitAppearance !== 'textfield' &&                  
-                              // Mobile android web browser has false positive, so must
-                              // check the height to see if the widget is actually there.
-                              (inputElem.offsetHeight !== 0);
-                              
-                      docElement.removeChild(inputElem);
-                              
-                    } else if (/^(search|tel)$/.test(inputElemType)){
-                      // Spec doesnt define any special parsing or detectable UI 
-                      //   behaviors so we pass these through as true
-                      
-                      // Interestingly, opera fails the earlier test, so it doesn't
-                      //  even make it here.
-                      
-                    } else if (/^(url|email)$/.test(inputElemType)) {
-                      // Real url and email support comes with prebaked validation.
-                      bool = inputElem.checkValidity && inputElem.checkValidity() === false;
-                      
-                    } else if (/^color$/.test(inputElemType)) {
-                        // chuck into DOM and force reflow for Opera bug in 11.00
-                        // github.com/Modernizr/Modernizr/issues#issue/159
-                        docElement.appendChild(inputElem);
-                        docElement.offsetWidth; 
-                        bool = inputElem.value != smile;
-                        docElement.removeChild(inputElem);
-
-                    } else {
-                      // If the upgraded input compontent rejects the :) text, we got a winner
-                      bool = inputElem.value != smile;
-                    }
-                }
-                
-                inputs[ props[i] ] = !!bool;
-            }
-            return inputs;
-        })('search tel url email datetime date month week time datetime-local number range color'.split(' '));
-
-    }
-
-
-
-    // End of test definitions
-    // -----------------------
-
-
-
-    // Run through all tests and detect their support in the current UA.
-    // todo: hypothetically we could be doing an array of tests and use a basic loop here.
-    for ( var feature in tests ) {
-        if ( hasOwnProperty( tests, feature ) ) {
-            // run the test, throw the return value into the Modernizr,
-            //   then based on that boolean, define an appropriate className
-            //   and push it into an array of classes we'll join later.
-            featurename  = feature.toLowerCase();
-            ret[ featurename ] = tests[ feature ]();
-
-            classes.push( ( ret[ featurename ] ? '' : 'no-' ) + featurename );
-        }
-    }
-    
-    // input tests need to run.
-    if (!ret.input) webforms();
-    
-
-   
-    // Per 1.6: deprecated API is still accesible for now:
-    ret.crosswindowmessaging = ret.postmessage;
-    ret.historymanagement = ret.history;
-
-
-
-    /**
-     * Addtest allows the user to define their own feature tests
-     * the result will be added onto the Modernizr object,
-     * as well as an appropriate className set on the html element
-     * 
-     * @param feature - String naming the feature
-     * @param test - Function returning true if feature is supported, false if not
-     */
-    ret.addTest = function (feature, test) {
-      feature = feature.toLowerCase();
-      
-      if (ret[ feature ]) {
-        return; // quit if you're trying to overwrite an existing test
-      } 
-      test = !!(test());
-      docElement.className += ' ' + (test ? '' : 'no-') + feature; 
-      ret[ feature ] = test;
-      return ret; // allow chaining.
-    };
-
-    /**
-     * Reset m.style.cssText to nothing to reduce memory footprint.
-     */
-    set_css( '' );
-    modElem = inputElem = null;
-
-    //>>BEGIN IEPP
-    // Enable HTML 5 elements for styling in IE. 
-    // fyi: jscript version does not reflect trident version
-    //      therefore ie9 in ie7 mode will still have a jScript v.9
-    if ( enableHTML5 && window.attachEvent && (function(){ var elem = document.createElement("div");
-                                      elem.innerHTML = "<elem></elem>";
-                                      return elem.childNodes.length !== 1; })()) {
-        // iepp v1.6.2 by @jon_neal : code.google.com/p/ie-print-protector
-        (function(win, doc) {
-          var elems = 'abbr|article|aside|audio|canvas|details|figcaption|figure|footer|header|hgroup|mark|meter|nav|output|progress|section|summary|time|video',
-            elemsArr = elems.split('|'),
-            elemsArrLen = elemsArr.length,
-            elemRegExp = new RegExp('(^|\\s)('+elems+')', 'gi'), 
-            tagRegExp = new RegExp('<(\/*)('+elems+')', 'gi'),
-            ruleRegExp = new RegExp('(^|[^\\n]*?\\s)('+elems+')([^\\n]*)({[\\n\\w\\W]*?})', 'gi'),
-            docFrag = doc.createDocumentFragment(),
-            html = doc.documentElement,
-            head = html.firstChild,
-            bodyElem = doc.createElement('body'),
-            styleElem = doc.createElement('style'),
-            body;
-          function shim(doc) {
-            var a = -1;
-            while (++a < elemsArrLen)
-              // Use createElement so IE allows HTML5-named elements in a document
-              doc.createElement(elemsArr[a]);
-          }
-          function getCSS(styleSheetList, mediaType) {
-            var a = -1,
-              len = styleSheetList.length,
-              styleSheet,
-              cssTextArr = [];
-            while (++a < len) {
-              styleSheet = styleSheetList[a];
-              // Get css from all non-screen stylesheets and their imports
-              if ((mediaType = styleSheet.media || mediaType) != 'screen') cssTextArr.push(getCSS(styleSheet.imports, mediaType), styleSheet.cssText);
-            }
-            return cssTextArr.join('');
-          }
-          // Shim the document and iepp fragment
-          shim(doc);
-          shim(docFrag);
-          // Add iepp custom print style element
-          head.insertBefore(styleElem, head.firstChild);
-          styleElem.media = 'print';
-          win.attachEvent(
-            'onbeforeprint',
-            function() {
-              var a = -1,
-                cssText = getCSS(doc.styleSheets, 'all'),
-                cssTextArr = [],
-                rule;
-              body = body || doc.body;
-              // Get only rules which reference HTML5 elements by name
-              while ((rule = ruleRegExp.exec(cssText)) != null)
-                // Replace all html5 element references with iepp substitute classnames
-                cssTextArr.push((rule[1]+rule[2]+rule[3]).replace(elemRegExp, '$1.iepp_$2')+rule[4]);
-              // Write iepp custom print CSS
-              styleElem.styleSheet.cssText = cssTextArr.join('\n');
-              while (++a < elemsArrLen) {
-                var nodeList = doc.getElementsByTagName(elemsArr[a]),
-                  nodeListLen = nodeList.length,
-                  b = -1;
-                while (++b < nodeListLen)
-                  if (nodeList[b].className.indexOf('iepp_') < 0)
-                    // Append iepp substitute classnames to all html5 elements
-                    nodeList[b].className += ' iepp_'+elemsArr[a];
-              }
-              docFrag.appendChild(body);
-              html.appendChild(bodyElem);
-              // Write iepp substitute print-safe document
-              bodyElem.className = body.className;
-              // Replace HTML5 elements with <font> which is print-safe and shouldn't conflict since it isn't part of html5
-              bodyElem.innerHTML = body.innerHTML.replace(tagRegExp, '<$1font');
-            }
-          );
-          win.attachEvent(
-            'onafterprint',
-            function() {
-              // Undo everything done in onbeforeprint
-              bodyElem.innerHTML = '';
-              html.removeChild(bodyElem);
-              html.appendChild(body);
-              styleElem.styleSheet.cssText = '';
-            }
-          );
-        })(window, document);
-    }
-    //>>END IEPP
-
-    // Assign private properties to the return object with prefix
-    ret._enableHTML5     = enableHTML5;
-    ret._version         = version;
-
-    // Remove "no-js" class from <html> element, if it exists:
-    docElement.className = docElement.className.replace(/\bno-js\b/,'') 
-                            + ' js '
-
-                            // Add the new classes to the <html> element.
-                            + classes.join( ' ' );
-    
-    return ret;
-
-})(this,this.document);
 
 /* **********************************************
      Begin imagesloaded.js
@@ -2469,216 +1568,6 @@ function makeArray( obj ) {
 })(jQuery);
 
 /* **********************************************
-     Begin jquery.easing.1.3.js
-********************************************** */
-
-/*
- * jQuery Easing v1.3 - http://gsgd.co.uk/sandbox/jquery/easing/
- *
- * Uses the built in easing capabilities added In jQuery 1.1
- * to offer multiple easing options
- *
- * TERMS OF USE - jQuery Easing
- * 
- * Open source under the BSD License. 
- * 
- * Copyright © 2008 George McGinley Smith
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification, 
- * are permitted provided that the following conditions are met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list of 
- * conditions and the following disclaimer.
- * Redistributions in binary form must reproduce the above copyright notice, this list 
- * of conditions and the following disclaimer in the documentation and/or other materials 
- * provided with the distribution.
- * 
- * Neither the name of the author nor the names of contributors may be used to endorse 
- * or promote products derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY 
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- *  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- *  GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED 
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
- * OF THE POSSIBILITY OF SUCH DAMAGE. 
- *
-*/
-
-// t: current time, b: begInnIng value, c: change In value, d: duration
-jQuery.easing['jswing'] = jQuery.easing['swing'];
-
-jQuery.extend( jQuery.easing,
-{
-	def: 'easeOutQuad',
-	swing: function (x, t, b, c, d) {
-		//alert(jQuery.easing.default);
-		return jQuery.easing[jQuery.easing.def](x, t, b, c, d);
-	},
-	easeInQuad: function (x, t, b, c, d) {
-		return c*(t/=d)*t + b;
-	},
-	easeOutQuad: function (x, t, b, c, d) {
-		return -c *(t/=d)*(t-2) + b;
-	},
-	easeInOutQuad: function (x, t, b, c, d) {
-		if ((t/=d/2) < 1) return c/2*t*t + b;
-		return -c/2 * ((--t)*(t-2) - 1) + b;
-	},
-	easeInCubic: function (x, t, b, c, d) {
-		return c*(t/=d)*t*t + b;
-	},
-	easeOutCubic: function (x, t, b, c, d) {
-		return c*((t=t/d-1)*t*t + 1) + b;
-	},
-	easeInOutCubic: function (x, t, b, c, d) {
-		if ((t/=d/2) < 1) return c/2*t*t*t + b;
-		return c/2*((t-=2)*t*t + 2) + b;
-	},
-	easeInQuart: function (x, t, b, c, d) {
-		return c*(t/=d)*t*t*t + b;
-	},
-	easeOutQuart: function (x, t, b, c, d) {
-		return -c * ((t=t/d-1)*t*t*t - 1) + b;
-	},
-	easeInOutQuart: function (x, t, b, c, d) {
-		if ((t/=d/2) < 1) return c/2*t*t*t*t + b;
-		return -c/2 * ((t-=2)*t*t*t - 2) + b;
-	},
-	easeInQuint: function (x, t, b, c, d) {
-		return c*(t/=d)*t*t*t*t + b;
-	},
-	easeOutQuint: function (x, t, b, c, d) {
-		return c*((t=t/d-1)*t*t*t*t + 1) + b;
-	},
-	easeInOutQuint: function (x, t, b, c, d) {
-		if ((t/=d/2) < 1) return c/2*t*t*t*t*t + b;
-		return c/2*((t-=2)*t*t*t*t + 2) + b;
-	},
-	easeInSine: function (x, t, b, c, d) {
-		return -c * Math.cos(t/d * (Math.PI/2)) + c + b;
-	},
-	easeOutSine: function (x, t, b, c, d) {
-		return c * Math.sin(t/d * (Math.PI/2)) + b;
-	},
-	easeInOutSine: function (x, t, b, c, d) {
-		return -c/2 * (Math.cos(Math.PI*t/d) - 1) + b;
-	},
-	easeInExpo: function (x, t, b, c, d) {
-		return (t==0) ? b : c * Math.pow(2, 10 * (t/d - 1)) + b;
-	},
-	easeOutExpo: function (x, t, b, c, d) {
-		return (t==d) ? b+c : c * (-Math.pow(2, -10 * t/d) + 1) + b;
-	},
-	easeInOutExpo: function (x, t, b, c, d) {
-		if (t==0) return b;
-		if (t==d) return b+c;
-		if ((t/=d/2) < 1) return c/2 * Math.pow(2, 10 * (t - 1)) + b;
-		return c/2 * (-Math.pow(2, -10 * --t) + 2) + b;
-	},
-	easeInCirc: function (x, t, b, c, d) {
-		return -c * (Math.sqrt(1 - (t/=d)*t) - 1) + b;
-	},
-	easeOutCirc: function (x, t, b, c, d) {
-		return c * Math.sqrt(1 - (t=t/d-1)*t) + b;
-	},
-	easeInOutCirc: function (x, t, b, c, d) {
-		if ((t/=d/2) < 1) return -c/2 * (Math.sqrt(1 - t*t) - 1) + b;
-		return c/2 * (Math.sqrt(1 - (t-=2)*t) + 1) + b;
-	},
-	easeInElastic: function (x, t, b, c, d) {
-		var s=1.70158;var p=0;var a=c;
-		if (t==0) return b;  if ((t/=d)==1) return b+c;  if (!p) p=d*.3;
-		if (a < Math.abs(c)) { a=c; var s=p/4; }
-		else var s = p/(2*Math.PI) * Math.asin (c/a);
-		return -(a*Math.pow(2,10*(t-=1)) * Math.sin( (t*d-s)*(2*Math.PI)/p )) + b;
-	},
-	easeOutElastic: function (x, t, b, c, d) {
-		var s=1.70158;var p=0;var a=c;
-		if (t==0) return b;  if ((t/=d)==1) return b+c;  if (!p) p=d*.3;
-		if (a < Math.abs(c)) { a=c; var s=p/4; }
-		else var s = p/(2*Math.PI) * Math.asin (c/a);
-		return a*Math.pow(2,-10*t) * Math.sin( (t*d-s)*(2*Math.PI)/p ) + c + b;
-	},
-	easeInOutElastic: function (x, t, b, c, d) {
-		var s=1.70158;var p=0;var a=c;
-		if (t==0) return b;  if ((t/=d/2)==2) return b+c;  if (!p) p=d*(.3*1.5);
-		if (a < Math.abs(c)) { a=c; var s=p/4; }
-		else var s = p/(2*Math.PI) * Math.asin (c/a);
-		if (t < 1) return -.5*(a*Math.pow(2,10*(t-=1)) * Math.sin( (t*d-s)*(2*Math.PI)/p )) + b;
-		return a*Math.pow(2,-10*(t-=1)) * Math.sin( (t*d-s)*(2*Math.PI)/p )*.5 + c + b;
-	},
-	easeInBack: function (x, t, b, c, d, s) {
-		if (s == undefined) s = 1.70158;
-		return c*(t/=d)*t*((s+1)*t - s) + b;
-	},
-	easeOutBack: function (x, t, b, c, d, s) {
-		if (s == undefined) s = 1.70158;
-		return c*((t=t/d-1)*t*((s+1)*t + s) + 1) + b;
-	},
-	easeInOutBack: function (x, t, b, c, d, s) {
-		if (s == undefined) s = 1.70158; 
-		if ((t/=d/2) < 1) return c/2*(t*t*(((s*=(1.525))+1)*t - s)) + b;
-		return c/2*((t-=2)*t*(((s*=(1.525))+1)*t + s) + 2) + b;
-	},
-	easeInBounce: function (x, t, b, c, d) {
-		return c - jQuery.easing.easeOutBounce (x, d-t, 0, c, d) + b;
-	},
-	easeOutBounce: function (x, t, b, c, d) {
-		if ((t/=d) < (1/2.75)) {
-			return c*(7.5625*t*t) + b;
-		} else if (t < (2/2.75)) {
-			return c*(7.5625*(t-=(1.5/2.75))*t + .75) + b;
-		} else if (t < (2.5/2.75)) {
-			return c*(7.5625*(t-=(2.25/2.75))*t + .9375) + b;
-		} else {
-			return c*(7.5625*(t-=(2.625/2.75))*t + .984375) + b;
-		}
-	},
-	easeInOutBounce: function (x, t, b, c, d) {
-		if (t < d/2) return jQuery.easing.easeInBounce (x, t*2, 0, c, d) * .5 + b;
-		return jQuery.easing.easeOutBounce (x, t*2-d, 0, c, d) * .5 + c*.5 + b;
-	}
-});
-
-/*
- *
- * TERMS OF USE - EASING EQUATIONS
- * 
- * Open source under the BSD License. 
- * 
- * Copyright © 2001 Robert Penner
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification, 
- * are permitted provided that the following conditions are met:
- * 
- * Redistributions of source code must retain the above copyright notice, this list of 
- * conditions and the following disclaimer.
- * Redistributions in binary form must reproduce the above copyright notice, this list 
- * of conditions and the following disclaimer in the documentation and/or other materials 
- * provided with the distribution.
- * 
- * Neither the name of the author nor the names of contributors may be used to endorse 
- * or promote products derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY 
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- *  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- *  GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED 
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED 
- * OF THE POSSIBILITY OF SUCH DAMAGE. 
- *
- */
-
-/* **********************************************
      Begin jquery.scrollTo.js
 ********************************************** */
 
@@ -2856,235 +1745,3 @@ jQuery.extend( jQuery.easing,
 	};
 
 })( jQuery );
-
-/* **********************************************
-     Begin jquery.lazyload.js
-********************************************** */
-
-/*
- * Lazy Load - jQuery plugin for lazy loading images
- *
- * Copyright (c) 2007-2012 Mika Tuupola
- *
- * Licensed under the MIT license:
- *   http://www.opensource.org/licenses/mit-license.php
- *
- * Project home:
- *   http://www.appelsiini.net/projects/lazyload
- *
- * Version:  1.8.3
- *
- */
-(function($, window, document, undefined) {
-    var $window = $(window);
-
-    $.fn.lazyload = function(options) {
-        var elements = this;
-        var $container;
-        var settings = {
-            threshold       : 0,
-            failure_limit   : 0,
-            event           : "scroll",
-            effect          : "show",
-            container       : window,
-            data_attribute  : "original",
-            skip_invisible  : true,
-            appear          : null,
-            load            : null
-        };
-
-        function update() {
-            var counter = 0;
-      
-            elements.each(function() {
-                var $this = $(this);
-                if (settings.skip_invisible && !$this.is(":visible")) {
-                    return;
-                }
-                if ($.abovethetop(this, settings) ||
-                    $.leftofbegin(this, settings)) {
-                        /* Nothing. */
-                } else if (!$.belowthefold(this, settings) &&
-                    !$.rightoffold(this, settings)) {
-                        $this.trigger("appear");
-                        /* if we found an image we'll load, reset the counter */
-                        counter = 0;
-                } else {
-                    if (++counter > settings.failure_limit) {
-                        return false;
-                    }
-                }
-            });
-
-        }
-
-        if(options) {
-            /* Maintain BC for a couple of versions. */
-            if (undefined !== options.failurelimit) {
-                options.failure_limit = options.failurelimit; 
-                delete options.failurelimit;
-            }
-            if (undefined !== options.effectspeed) {
-                options.effect_speed = options.effectspeed; 
-                delete options.effectspeed;
-            }
-
-            $.extend(settings, options);
-        }
-
-        /* Cache container as jQuery as object. */
-        $container = (settings.container === undefined ||
-                      settings.container === window) ? $window : $(settings.container);
-
-        /* Fire one scroll event per scroll. Not one scroll event per image. */
-        if (0 === settings.event.indexOf("scroll")) {
-            $container.bind(settings.event, function(event) {
-                return update();
-            });
-        }
-
-        this.each(function() {
-            var self = this;
-            var $self = $(self);
-
-            self.loaded = false;
-
-            /* When appear is triggered load original image. */
-            $self.one("appear", function() {
-                if (!this.loaded) {
-                    if (settings.appear) {
-                        var elements_left = elements.length;
-                        settings.appear.call(self, elements_left, settings);
-                    }
-                    $("<img />")
-                        .bind("load", function() {
-                            $self
-                                .hide()
-                                .attr("src", $self.data(settings.data_attribute))
-                                [settings.effect](settings.effect_speed);
-                            self.loaded = true;
-
-                            /* Remove image from array so it is not looped next time. */
-                            var temp = $.grep(elements, function(element) {
-                                return !element.loaded;
-                            });
-                            elements = $(temp);
-
-                            if (settings.load) {
-                                var elements_left = elements.length;
-                                settings.load.call(self, elements_left, settings);
-                            }
-                        })
-                        .attr("src", $self.data(settings.data_attribute));
-                }
-            });
-
-            /* When wanted event is triggered load original image */
-            /* by triggering appear.                              */
-            if (0 !== settings.event.indexOf("scroll")) {
-                $self.bind(settings.event, function(event) {
-                    if (!self.loaded) {
-                        $self.trigger("appear");
-                    }
-                });
-            }
-        });
-
-        /* Check if something appears when window is resized. */
-        $window.bind("resize", function(event) {
-            update();
-        });
-              
-        /* With IOS5 force loading images when navigating with back button. */
-        /* Non optimal workaround. */
-        if ((/iphone|ipod|ipad.*os 5/gi).test(navigator.appVersion)) {
-            $window.bind("pageshow", function(event) {
-                if (event.originalEvent.persisted) {
-                    elements.each(function() {
-                        $(this).trigger("appear");
-                    });
-                }
-            });
-        }
-
-        /* Force initial check if images should appear. */
-        $(window).load(function() {
-            update();
-        });
-        
-        return this;
-    };
-
-    /* Convenience methods in jQuery namespace.           */
-    /* Use as  $.belowthefold(element, {threshold : 100, container : window}) */
-
-    $.belowthefold = function(element, settings) {
-        var fold;
-        
-        if (settings.container === undefined || settings.container === window) {
-            fold = $window.height() + $window.scrollTop();
-        } else {
-            fold = $(settings.container).offset().top + $(settings.container).height();
-        }
-
-        return fold <= $(element).offset().top - settings.threshold;
-    };
-    
-    $.rightoffold = function(element, settings) {
-        var fold;
-
-        if (settings.container === undefined || settings.container === window) {
-            fold = $window.width() + $window.scrollLeft();
-        } else {
-            fold = $(settings.container).offset().left + $(settings.container).width();
-        }
-
-        return fold <= $(element).offset().left - settings.threshold;
-    };
-        
-    $.abovethetop = function(element, settings) {
-        var fold;
-        
-        if (settings.container === undefined || settings.container === window) {
-            fold = $window.scrollTop();
-        } else {
-            fold = $(settings.container).offset().top;
-        }
-
-        return fold >= $(element).offset().top + settings.threshold  + $(element).height();
-    };
-    
-    $.leftofbegin = function(element, settings) {
-        var fold;
-        
-        if (settings.container === undefined || settings.container === window) {
-            fold = $window.scrollLeft();
-        } else {
-            fold = $(settings.container).offset().left;
-        }
-
-        return fold >= $(element).offset().left + settings.threshold + $(element).width();
-    };
-
-    $.inviewport = function(element, settings) {
-         return !$.rightoffold(element, settings) && !$.leftofbegin(element, settings) &&
-                !$.belowthefold(element, settings) && !$.abovethetop(element, settings);
-     };
-
-    /* Custom selectors for your convenience.   */
-    /* Use as $("img:below-the-fold").something() or */
-    /* $("img").filter(":below-the-fold").something() which is faster */
-
-    $.extend($.expr[':'], {
-        "below-the-fold" : function(a) { return $.belowthefold(a, {threshold : 0}); },
-        "above-the-top"  : function(a) { return !$.belowthefold(a, {threshold : 0}); },
-        "right-of-screen": function(a) { return $.rightoffold(a, {threshold : 0}); },
-        "left-of-screen" : function(a) { return !$.rightoffold(a, {threshold : 0}); },
-        "in-viewport"    : function(a) { return $.inviewport(a, {threshold : 0}); },
-        /* Maintain BC for couple of versions. */
-        "above-the-fold" : function(a) { return !$.belowthefold(a, {threshold : 0}); },
-        "right-of-fold"  : function(a) { return $.rightoffold(a, {threshold : 0}); },
-        "left-of-fold"   : function(a) { return !$.rightoffold(a, {threshold : 0}); }
-    });
-
-})(jQuery, window, document);

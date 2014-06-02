@@ -15,23 +15,26 @@
 	<link href="fullpager/imagefill.css" rel="stylesheet" />
 	<link href="fullpager/fullpager.css" rel="stylesheet" />
 
-<!--
-	<script src="js/modernizr.js"></script>
+	<!-- For imagefill plugin -->
 	<script src="js/imagesloaded.js"></script>
 	<script src="js/jquery.imagefill.js"></script>
-	<script src="js/isInViewport.js"></script>
-	<script src="js/jquery.easing.1.3.js"></script>
-	<script src="js/jquery.scrollTo.js"></script>
-	<script src="js/jquery.lazyload.js"></script>
-	<script src="fullpager/jquery.fullpager.js"></script>
--->
-
-	<script src="fullpager/jquery.fullpager-combined.js"></script>
 	
+	<!-- For fullpager plugin -->
+	<script src="js/isInViewport.js"></script>
+	<script src="js/jquery.scrollTo.js"></script>
+	<script src="fullpager/jquery.fullpager.js"></script>
+
+<!--
+	<script src="fullpager/jquery.fullpager-combined.js"></script>
+-->	
 	<script>
 		$(function(){
 			
-			$('body').fullpager();
+			$('body').fullpager({
+				onPageChange: function() {
+					console.log('changed to ' + this.current);
+				}
+			});
 
 		});
 	</script>
@@ -40,29 +43,38 @@
 <body>
 	
 	<div class="fp-header">
+		<!-- 
+			Including this header element is optional, but usefull if you also want to 
+			include other elements (e.g. logo), otherwise it will be generated automatically.
+		-->
 	</div>
 	
 	<div id="introduction" class="fp-page" data-title="Introduction">
 		<section class="fp-content">
-			<h1>Introduction</h1>
+			<h1>Fullpager jQuery plugin</h1>
+			<p>Fullpager is a plugin to create full-screen paged content, as seen on <a href="http://letterboxd.com/2013/">the Letterboxd Year In Review</a>.</p>
+			<p><a href="http://github.com/sneaknz/fullpager">Download the latest copy</a> from Github</p>
 		</section>
 	</div>
 
-	<div id="one" class="fp-page" data-title="Image background" data-image="example/forrest-1600x800.jpg">
+	<div id="one" class="fp-page" data-title="Page Two" data-image="example/forrest-1600x800.jpg">
 		<section class="fp-content">
-			<h1>With a full bleed image background</h1>
+			<h1>Page Two</h1>
+			<p>With a full bleed image background</p>
 		</section>
 	</div>
 
 	<div id="two" class="fp-page" data-background="#456">
 		<section class="fp-content">
-			<h1>With a custom colour background</h1>
+			<h1>Page not shown in nav</h1>
+			<p>But with a custom background colour added.</p>
 		</section>
 	</div>
 
-	<div id="four" class="fp-page" data-title="Long-form content" data-background="#678">
+	<div id="three" class="fp-page" data-title="Page Three">
 		<section class="fp-content">
-			<h1>Long-form content</h1>
+			<h1>Page Three</h1>
+			<p>A page with long content that might go off the bottom of the browser.</p>
 			<p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
 			<p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
 			<p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
@@ -72,9 +84,10 @@
 		</section>
 	</div>
 
-	<div id="three" class="fp-page" data-title="Image background 2" data-image="example/water-1600x800.jpg">
+	<div id="four" class="fp-page" data-title="Page Four" data-image="example/water-1600x800.jpg">
 		<section class="fp-content">
-			<h1>Another with a full bleed image background</h1>
+			<h1>Page Four</h1>
+			<p>Another page with a full bleed image background, just to round things out.</p>
 		</section>
 	</div>
 		

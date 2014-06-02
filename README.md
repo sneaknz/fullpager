@@ -4,18 +4,15 @@ A plugin to create full-screen paged content, as seen on <a href="http://letterb
 
 ## Usage
 
-After including jQuery, add the necessary required files for the plugin. This thing depends on a buttload of plugins:
+After including jQuery, add the necessary required files for the plugin. This thing currently depends on a whole bunch of other plugins:
 
 	<link href="fullpager/imagefill.css" rel="stylesheet" />
 	<link href="fullpager/fullpager.css" rel="stylesheet" />
 
-	<script src="modernizr.js"></script>
 	<script src="imagesloaded.js"></script>
 	<script src="jquery.imagefill.js"></script>
 	<script src="isInViewport.js"></script>
-	<script src="jquery.easing.1.3.js"></script>
 	<script src="jquery.scrollTo.js"></script>
-	<script src="jquery.lazyload.js"></script>
 
 	<script src="jquery.fullpager.js"></script>
 	
@@ -26,7 +23,7 @@ Or if you are using the combined script that bundles all these plugins together:
 
 	<script src="jquery.fullpager-combined.js"></script>
 	
-The following HTML structure is used to set up the pages. Note that the body is used here as the overall container, but in theory you can also next the 'fp-page' items within another block element and use that as the base container. The 'fp-header' element is optional, and will be created automatically to contain the nav if left out, however you may want to include this so you can style a logo or other header elements etc.
+The following HTML structure is used to set up the pages. Note that the body is used here as the overall container, but in theory you can also nest the `.fp-page` items within another block element and use that as the base container. The `.fp-header` element is optional, and will be created automatically to contain the nav if left out, however you may want to include this so you can style a logo or other header elements etc.
 
 	<body>
 	
@@ -38,7 +35,7 @@ The following HTML structure is used to set up the pages. Note that the body is 
 			</section>
 		</div>
 
-		<div id="one" class="fp-page" data-title="Image background" data-image="example/forrest-1600x800.jpg">
+		<div id="one" class="fp-page" data-title="Page Two" data-image="example/forrest-1600x800.jpg">
 			<section class="fp-content">
 				...
 			</section>
@@ -50,13 +47,7 @@ The following HTML structure is used to set up the pages. Note that the body is 
 			</section>
 		</div>
 
-		<div id="four" class="fp-page" data-title="Long-form content" data-background="#678">
-			<section class="fp-content">
-				...
-			</section>
-		</div>
-
-		<div id="three" class="fp-page" data-title="Image background 2" data-image="example/water-1600x800.jpg">
+		<div id="four" class="fp-page" data-title="Page Three" data-background="#678">
 			<section class="fp-content">
 				...
 			</section>
@@ -68,18 +59,19 @@ Set up the pages by calling fullpager on the containing element, e.g:
 
 	$("body").fullpager();
 
-or
+or if you wish to use another container other than `body`, reference that instead:
 
-	$(".container").fullpager({
-		nextText: 'Next page',
-		prevText: 'Previous page'
-	});
+	$(".container").fullpager();
 
 ## Options
 
-There are two places you can specify options. The first is when you call the plugin, by passing in options:
+There are two places to set options. The first is when you call the plugin, by passing in an options object:
 
 <table>
+	<tr>
+		<th>pageSelector</th>
+		<td>String. The selector used to denote pages within the container. Defaults to `.fp-page`.</td>
+	</tr>
 	<tr>
 		<th>pagination</th>
 		<td>Boolean. Whether to show prev/next links. Defaults to true.</td>
@@ -96,9 +88,21 @@ There are two places you can specify options. The first is when you call the plu
 		<th>onScroll</th>
 		<td>Callback. Optional, called on scroll when an update to check what page is in view is done. In the context of the callback, 'this' is the full object containing options and objects. Console.log the 'this' value to see what it contains.</td>
 	</tr>
+	<tr>
+		<th>onPageChange</th>
+		<td>Callback. Optional, called when the current page is set. In the context of the callback, 'this' is same as above for onScroll.</td>
+	</tr>
+	<tr>
+		<th>activeClass</th>
+		<td>String. The class name used to denote the currently selected navigation item. Defaults to `active`.</td>
+	</tr>
+	<tr>
+		<th>duration</th>
+		<td>Int. The time of page scroll transitions, in miliseconds. Defaults to 600.</td>
+	</tr>
 </table>
 
-The second is by adding attributes to individual Page elements.
+The second is on the page elements themselves, in the form of attributes:
 
 <table>
 	<tr>
@@ -127,14 +131,7 @@ The second is by adding attributes to individual Page elements.
 	</tr>
 </table>
 
-<!--
-## Requirements
-
-The plugin requires jQuery to be included in the page, and also the [imagesloaded](http://imagesloaded.desandro.com) plugin from David Desandro. A copy of the imagesloaded plugin is included with this distribution, or you can use the bundled `jquery.imagefill-combined.min.js` file which already incorporates the plugin if you don't want to include it separately.
-
-
 ## To-do
 
-- TODO: Check for image load status, and if an error then select another from the array. Test with bad references to local images and also with internet disabled for web-based images.
-- CONSIDER: Add options for loader animations and/or colouring.
--->
+— Update to use debounced resize
+- Remove dependencies on other plugins
