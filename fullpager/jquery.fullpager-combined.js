@@ -12,7 +12,7 @@
 /*!
  * Fullpager
  * Mike Harding (@sneak)
- * v1.2.0
+ * v1.2.1
  * 
  * Plugin to create full-screen verticlly paged content.
  * http://code.sneak.co.nz/fullpager/
