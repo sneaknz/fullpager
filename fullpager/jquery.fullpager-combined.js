@@ -261,6 +261,7 @@
 				me.$current = me.$pages.filter('#'+id).eq(0);
 				me.current = id;
 				me._updateNav(id);
+				me.$current.addClass('fp-current').siblings().removeClass('fp-current');
 				
 				if ( typeof me.options.onPageChange === 'function' ) {
 					me.options.onPageChange.call(me);
