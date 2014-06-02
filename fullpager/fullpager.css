@@ -41,7 +41,7 @@ html {
   display: inline-block;
   margin: 0 5px;
 }
-.fp-nav .active a {
+.fp-nav .fp-nav-active a {
   opacity: 0.6;
 }
 .fp-page {

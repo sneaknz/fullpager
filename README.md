@@ -93,8 +93,12 @@ There are two places to set options. The first is when you call the plugin, by p
 		<td>Callback. Optional, called when the current page is set. In the context of the callback, 'this' is same as above for onScroll.</td>
 	</tr>
 	<tr>
-		<th>activeClass</th>
-		<td>String. The class name used to denote the currently selected navigation item. Defaults to `active`.</td>
+		<th>activeNavClass</th>
+		<td>String. The class name used to denote the currently selected navigation item. Defaults to `fp-nav-active`.</td>
+	</tr>
+	<tr>
+		<th>activePageClass</th>
+		<td>String. The class name used to denote the currently selected page. Defaults to `fp-page-active`.</td>
 	</tr>
 	<tr>
 		<th>duration</th>

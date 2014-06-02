@@ -45,7 +45,8 @@
 			prevText: 'Prev',
 			onScroll: null,
 			onPageChange: null,
-			activeClass: 'active',
+			activeNavClass: 'fp-nav-active',
+			activePageClass: 'fp-page-active',
 			duration: 600
 		},
 		
@@ -236,7 +237,7 @@
 			var me = this;
 			var $li = me.$nav.find('li');
 			
-			$li.removeClass(me.options.activeClass).filter('[data-id=' + id + ']').addClass(me.options.activeClass);
+			$li.removeClass(me.options.activeNavClass).filter('[data-id=' + id + ']').addClass(me.options.activeNavClass);
 			
 			// Update prev/next
 			if ( me.pagination ) {
@@ -261,7 +262,7 @@
 				me.$current = me.$pages.filter('#'+id).eq(0);
 				me.current = id;
 				me._updateNav(id);
-				me.$current.addClass('fp-current').siblings().removeClass('fp-current');
+				me.$current.addClass(me.options.activePageClass).siblings().removeClass(me.options.activePageClass);
 				
 				if ( typeof me.options.onPageChange === 'function' ) {
 					me.options.onPageChange.call(me);
