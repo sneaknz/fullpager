@@ -12,7 +12,7 @@
 /*!
  * Fullpager
  * Mike Harding (@sneak)
- * v1.2.2
+ * v1.2.3
  * 
  * Plugin to create full-screen verticlly paged content.
  * http://code.sneak.co.nz/fullpager/
@@ -59,6 +59,7 @@
 			me.$pages = me.$el.find(me.options.pageSelector);
 			me.$navigable = me.$pages.filter('[id]');
 			me.touch = me._touchEnabled();
+			me.scrolling = false;
 			
 			if ( me.$pages.length === 0 ) {
 				// No pages passed in
@@ -343,10 +344,16 @@
 		_scroll: function() {
 			var me = this;
 			
+			me.scrolling = true;
+			
 			if ( me.scrollTimer ) {
-				clearTimeout(me.scrollTimer);
+				clearTimeout(me.scrollTimer);	
 			}
-			me.scrollTimer = setTimeout(me._checkIfInView(), 100);
+
+			me.scrollTimer = setTimeout(function() {
+				me._checkIfInView();
+				me.scrolling = false;
+			}, 100);
 		},
 		
 		_checkIfInView: function() {
@@ -394,10 +401,12 @@
 		
 			me._centerContent();
 			
-			$.scrollTo(me.$current, {
-				duration: 600,
-				easing: 'easeOutQuart'
-			});
+			if ( !me.scrolling && !me.animating ) {
+				$.scrollTo(me.$current, {
+					duration: 600,
+					easing: 'easeOutQuart'
+				});
+			}
 		},
 		
 		destroy: function() {
