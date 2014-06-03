@@ -1,7 +1,7 @@
 /*!
  * Fullpager
  * Mike Harding (@sneak)
- * v1.2.1
+ * v1.2.2
  * 
  * Plugin to create full-screen verticlly paged content.
  * http://code.sneak.co.nz/fullpager/
@@ -46,6 +46,7 @@
 			me.$window = $(window);
 			me.$document = $(document);
 			me.$pages = me.$el.find(me.options.pageSelector);
+			me.$navigable = me.$pages.filter('[id]');
 			me.touch = me._touchEnabled();
 			
 			if ( me.$pages.length === 0 ) {
@@ -55,28 +56,30 @@
 			}
 			
 			me._navigation();
+			me._bindings();
+			me._layout();
+			me._centerContent();
 			
 			// Set initial position if a hash exists
 			var hash = location.hash;
 			
 			if (hash.length) {
 				var h = hash.slice(1);
-				me.move(h);
+				me._setCurrent(h);
+
+				$.scrollTo( me.$pages.filter('[id=' + h + ']'), {
+					duration: 1
+				});
 			} else {
-				me.move( me.$pages.eq(0).attr('id') );
+				me._setCurrent( me.$pages.eq(0).attr('id') );
 			}
-			
-			me._bindings();
-			me._checkIfInView();
-			me._layout();
-			me.refresh();
 		},
 		
 		_navigation: function() {
 			var me = this;
 			
 			// Add next/prev nav
-			if ( me.$pages.length > 1 && me.options.pagination ) {
+			if ( me.$navigable.length > 1 && me.options.pagination ) {
 				me.$el.append('<p class="fp-pagination"><a href="#" class="fp-prev">' + me.options.prevText + '</a><a href="#" class="fp-next">' + me.options.nextText + '</a></p>');
 				
 				me.$next = me.$el.find('.fp-next');
@@ -98,10 +101,10 @@
 			// Add main navigation
 			var nav = '<nav class="fp-nav"><ul>'; // Start the string
 			
-			me.$pages.each(function() {
+			me.$navigable.each(function() {
 				var $page = $(this);
 				
-				if ( $page.data('title') && $page.attr('id') ) {
+				if ( $page.data('title') ) {
 					// Note space left at end of <li>'s to enable use of justified list layouts
 					nav += '<li data-id="' + $page.attr('id') + '"><a href="#' + $page.attr('id') + '">' + $page.data('title') + '</a></li> ';
 				}
@@ -200,12 +203,7 @@
 			} else {
 				var $newPage = me.$pages.filter('#'+id).eq(0);
 			
-				if (history.pushState) {
-					history.pushState(null, null, '#'+id);
-				} else {
-					window.location.hash = id;
-				}
-
+				me._pushState(id);
 				me.animating = true;
 
 				$.scrollTo.window().stop(true); // Cancel any exisitng scrolling first to avoid queuing
@@ -222,19 +220,28 @@
 			}
 		},
 		
+		_pushState: function(id) {
+			if (history.pushState) {
+				history.pushState(null, null, '#'+id);
+			} else {
+				window.location.hash = id;
+			}
+		},
+		
 		_updateNav: function(id) {
 			var me = this;
+			
 			var $li = me.$nav.find('li');
 			
 			$li.removeClass(me.options.activeNavClass).filter('[data-id=' + id + ']').addClass(me.options.activeNavClass);
 			
 			// Update prev/next
-			if ( me.pagination ) {
-				var pos = me.$pages.index(me.$current);
+			if ( me.options.pagination ) {
+				var pos = me.$navigable.index(me.$current);
 				if (pos === 0) {
 					// First page, so hide 'prev' arrow
 					me.$el.addClass('fp-first-page-active').removeClass('fp-last-page-active');
-				} else if (pos === me.$pages.length - 1) {
+				} else if (pos === me.$navigable.length - 1) {
 					// Last page, so hide 'next' arrow
 					me.$el.addClass('fp-last-page-active').removeClass('fp-first-page-active');
 				} else {
@@ -247,11 +254,12 @@
 		_setCurrent: function(id) {
 			var me = this;
 			
-			if (me.current !== id) {
-				me.$current = me.$pages.filter('#'+id).eq(0);
+			if ( me.current !== id && me.$navigable.filter('#'+id).length ) {
+				me.$current = me.$navigable.filter('#'+id).eq(0);
 				me.current = id;
 				me._updateNav(id);
 				me.$current.addClass(me.options.activePageClass).siblings().removeClass(me.options.activePageClass);
+				me._pushState(id);
 				
 				if ( typeof me.options.onPageChange === 'function' ) {
 					me.options.onPageChange.call(me);
@@ -262,13 +270,13 @@
 		_calculateId: function(offset) {
 			var me = this;
 			
-			var pos = me.$pages.index(me.$current),
+			var pos = me.$navigable.index(me.$current),
 				id = me.current;
 				
-			if ( ((pos === 0 && offset === -1) || (pos === me.$pages.length - 1 && offset === 1)) ) {
+			if ( ((pos === 0 && offset === -1) || (pos === me.$navigable.length - 1 && offset === 1)) ) {
 				// Can't navigate from here, so leave the same
 			} else {
-				var $targetPage = me.$pages.eq(pos += offset);
+				var $targetPage = me.$navigable.eq(pos += offset);
 				id = $targetPage.attr('id');
 			}
 			
@@ -372,9 +380,6 @@
 		
 		refresh: function() {
 			var me = this;
-			
-			me.viewportWidth = me.$window.width();
-			me.viewportHeight = me.$window.height();
 		
 			me._centerContent();
 			

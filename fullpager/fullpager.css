@@ -7,7 +7,7 @@ html {
   height: 100%;
 }
 .fp-header {
-  background: rgba(20, 24, 28, 0.9);
+  background: rgba(0, 0, 0, 0.8);
   position: fixed;
   z-index: 1;
   top: 0;
@@ -24,9 +24,10 @@ html {
 .fp-header li,
 .fp-header p {
   line-height: 50px;
+  font-size: 15px;
 }
 .fp-header a {
-  color: #ddd;
+  color: rgba(255, 255, 255, 0.7);
   text-decoration: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.35);
 }
@@ -86,6 +87,7 @@ html {
   right: 10px;
   line-height: 50px;
   z-index: 2;
+  font-size: 15px;
 }
 .fp-pagination a {
   margin-left: 10px;

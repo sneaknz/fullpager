@@ -47,7 +47,7 @@ The following HTML structure is used to set up the pages. Note that the body is 
 			</section>
 		</div>
 
-		<div id="four" class="fp-page" data-title="Page Three" data-background="#678">
+		<div id="four" class="fp-page" data-title="Page Three" data-image="http://farm6.staticflickr.com/5206/5352726192_aa9bd63ebb_b.jpg">
 			<section class="fp-content">
 				...
 			</section>
@@ -111,25 +111,21 @@ The second is on the page elements themselves, in the form of attributes:
 <table>
 	<tr>
 		<th>id</th>
-		<td>Required</td>
 		<td>string</td>
-		<td>An ID for the page block. This will also be used for navigation purposes, and will show in the URL as a hash when switching between pages via navigation.</td>
+		<td>An ID for the page block. This will also be used for navigation purposes, and will show in the URL as a hash when switching between pages via navigation. If no ID attribute is supplied, the page will be skipped when navigating via the nav or prev/next links and the hash will not be updated.</td>
 	</tr>
 	<tr>
 		<th>data-title</th>
-		<td>Required</td>
 		<td>string</td>
-		<td>The title that will be used in navigation. If this is not included then the page will not be shown in the nav.</td>
+		<td>The title that will be used in navigation. If this is not included then the page will not be included in the nav.</td>
 	</tr>
 	<tr>
 		<th>data-background</th>
-		<td>Optional</td>
 		<td>hex string</td>
 		<td>Add a custom colour to the background of this page.</td>
 	</tr>
 	<tr>
 		<th>data-image</th>
-		<td>Optional</td>
 		<td>string</td>
 		<td>The URL to an image that will be used as the background for the page. The image will automatically scale to fill the entire background.</td>
 	</tr>
