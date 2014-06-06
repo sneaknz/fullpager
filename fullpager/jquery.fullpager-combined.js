@@ -369,6 +369,10 @@
 					me.scrolling = false;
 				}, 100);
 			}
+				
+			if ( typeof me.options.onScroll === 'function' ) {
+				me.options.onScroll.call(me);
+			}
 		},
 		
 		_checkIfInView: function() {
@@ -381,10 +385,6 @@
 					}
 				}
 			});
-			
-			if ( typeof me.options.onScroll === 'function' ) {
-				me.options.onScroll.call(me);
-			}
 		},
 		
 		_centerContent: function() {
