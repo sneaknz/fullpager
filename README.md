@@ -12,6 +12,7 @@ After including jQuery, add the necessary required files for the plugin. This th
 	<script src="imagesloaded.js"></script>
 	<script src="jquery.imagefill.js"></script>
 	<script src="isInViewport.js"></script>
+	<script src="jquery.ba-throttle-debounce.js"></script>
 	<script src="jquery.scrollTo.js"></script>
 
 	<script src="jquery.fullpager.js"></script>

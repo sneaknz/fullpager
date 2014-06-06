@@ -1,7 +1,7 @@
 /*!
  * Fullpager
  * Mike Harding (@sneak)
- * v1.2.3
+ * v1.2.4
  * 
  * Plugin to create full-screen verticlly paged content.
  * http://code.sneak.co.nz/fullpager/
@@ -67,7 +67,9 @@
 			if (hash.length) {
 				var h = hash.slice(1);
 				me._setCurrent(h);
-
+				
+				$.scrollTo.window().stop(true); // Cancel any exisitng scrolling first to avoid queuing
+				
 				$.scrollTo( me.$pages.filter('[id=' + h + ']'), {
 					duration: 1
 				});
@@ -87,13 +89,17 @@
 				me.$prev = me.$el.find('.fp-prev');
 				
 				me.$next.on('click', function(e){
-					e.preventDefault();
+					if ( !me.touch ) {
+						e.preventDefault();
+					}
 					var id = me._calculateId(1);
 					me.move(id);
 				});
 			
 				me.$prev.on('click', function(e){
-					e.preventDefault();
+					if ( !me.touch ) {
+						e.preventDefault();
+					}
 					var id = me._calculateId(-1);
 					me.move(id);
 				});
@@ -125,16 +131,14 @@
 			me.$nav = $header.find('.fp-nav');
 
 			me.$nav.find('a').on('click', function(e){
-				e.preventDefault();
-				
 				var $this = $(this),
 					id = $this.parent('li').data('id');
 				
-				if (me.touch) {
-					me._updateNav(id);
-				} else {
-					me.move(id);
+				if ( !me.touch ) {
+					e.preventDefault();
 				}
+				
+				me.move(id);
 			});
 		},
 		
@@ -153,14 +157,14 @@
 				return me._scroll(ev);
 			};
 			
-			me.$window.on('resize.' + namespace, me._resizeDelegate);
+			me.$window.on('resize.' + namespace, $.debounce( 100, me._resizeDelegate ));
 			me.$window.trigger('resize');
 
 			me.$document.on('keydown.' + namespace, me._keydownDelegate);
 			
 			// Checks for whether a page is in the viewport
 			me.scrollTimer = null;
-			me.$window.on('scroll.' + namespace, me._scrollDelegate);
+			me.$window.on('scroll.' + namespace, $.throttle( 100, me._scrollDelegate ));
 		},
 		
 		_layout: function() {
@@ -205,19 +209,21 @@
 				var $newPage = me.$pages.filter('#'+id).eq(0);
 			
 				me._pushState(id);
-				me.animating = true;
-
-				$.scrollTo.window().stop(true); // Cancel any exisitng scrolling first to avoid queuing
-				
-				$.scrollTo( $newPage, {
-					duration: me.options.duration,
-					easing: 'easeOutQuart',
-					onAfter: function(){
-						me.animating = false;
-					}
-				});
-				
 				me._setCurrent(id);
+				
+				if ( !me.touch ) {
+					me.animating = true;
+
+					$.scrollTo.window().stop(true); // Cancel any exisitng scrolling first to avoid queuing
+				
+					$.scrollTo( $newPage, {
+						duration: me.options.duration,
+						easing: 'easeOutQuart',
+						onAfter: function(){
+							me.animating = false;
+						}
+					});
+				}
 			}
 		},
 		
@@ -242,12 +248,18 @@
 				if (pos === 0) {
 					// First page, so hide 'prev' arrow
 					me.$el.addClass('fp-first-page-active').removeClass('fp-last-page-active');
+					me.$prev.attr('href', '#');
+					me.$next.attr('href', '#' + me.$navigable.eq(pos + 1).attr('id'));
 				} else if (pos === me.$navigable.length - 1) {
 					// Last page, so hide 'next' arrow
 					me.$el.addClass('fp-last-page-active').removeClass('fp-first-page-active');
+					me.$next.attr('href', '#');
+					me.$prev.attr('href', '#' + me.$navigable.eq(pos - 1).attr('id'));
 				} else {
 					// Show the whole goddamn lot
 					me.$el.removeClass('fp-last-page-active').removeClass('fp-first-page-active');
+					me.$prev.attr('href', '#' + me.$navigable.eq(pos - 1).attr('id'));
+					me.$next.attr('href', '#' + me.$navigable.eq(pos + 1).attr('id'));
 				}
 			}
 		},
@@ -333,16 +345,18 @@
 		_scroll: function() {
 			var me = this;
 			
-			me.scrolling = true;
+			if ( !me.animating ) {
+				me.scrolling = true;
 			
-			if ( me.scrollTimer ) {
-				clearTimeout(me.scrollTimer);	
-			}
+				if ( me.scrollTimer ) {
+					clearTimeout(me.scrollTimer);	
+				}
 
-			me.scrollTimer = setTimeout(function() {
-				me._checkIfInView();
-				me.scrolling = false;
-			}, 100);
+				me.scrollTimer = setTimeout(function() {
+					me._checkIfInView();
+					me.scrolling = false;
+				}, 100);
+			}
 		},
 		
 		_checkIfInView: function() {
@@ -387,13 +401,19 @@
 		
 		refresh: function() {
 			var me = this;
-		
+
 			me._centerContent();
 			
-			if ( !me.scrolling && !me.animating ) {
+			if ( !me.scrolling ) {
+				$.scrollTo.window().stop(true); // Cancel any exisitng scrolling first to avoid queuing
+				me.animating = true;
+
 				$.scrollTo(me.$current, {
-					duration: 600,
-					easing: 'easeOutQuart'
+					duration: me.options.duration,
+					easing: 'easeOutQuart',
+					onAfter: function(){
+						me.animating = false;
+					}
 				});
 			}
 		},
@@ -412,14 +432,6 @@
 		
 		_touchEnabled: function() {
 			 return (('ontouchstart' in window) || (navigator.MaxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0));
-		},
-		
-		_onResize: function(c,t){
-			onresize = function(){
-				clearTimeout(t);
-				t = setTimeout(c,100);
-			};
-			return c;
 		},
 		
 		option: function(opts) {
