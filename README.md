@@ -68,69 +68,26 @@ or if you wish to use another container other than `body`, reference that instea
 
 There are two places to set options. The first is when you call the plugin, by passing in an options object:
 
-<table>
-	<tr>
-		<th>pageSelector</th>
-		<td>String. The selector used to denote pages within the container. Defaults to `.fp-page`.</td>
-	</tr>
-	<tr>
-		<th>pagination</th>
-		<td>Boolean. Whether to show prev/next links. Defaults to true.</td>
-	</tr>
-	<tr>
-		<th>nextText</th>
-		<td>String. The text for the 'next' page link. Defaults to 'Next'</td>
-	</tr>
-	<tr>
-		<th>prevText</th>
-		<td>String. The text for the 'next' page link. Defaults to 'Prev'</td>
-	</tr>
-	<tr>
-		<th>onScroll</th>
-		<td>Callback. Optional, called on scroll when an update to check what page is in view is done. In the context of the callback, 'this' is the full object containing options and objects. Console.log the 'this' value to see what it contains.</td>
-	</tr>
-	<tr>
-		<th>onPageChange</th>
-		<td>Callback. Optional, called when the current page is set. In the context of the callback, 'this' is same as above for onScroll.</td>
-	</tr>
-	<tr>
-		<th>activeNavClass</th>
-		<td>String. The class name used to denote the currently selected navigation item. Defaults to `fp-nav-active`.</td>
-	</tr>
-	<tr>
-		<th>activePageClass</th>
-		<td>String. The class name used to denote the currently selected page. Defaults to `fp-page-active`.</td>
-	</tr>
-	<tr>
-		<th>duration</th>
-		<td>Int. The time of page scroll transitions, in miliseconds. Defaults to 600.</td>
-	</tr>
-</table>
+Option | Type | Description
+:----- | :--- | :----------
+pageSelector | string | The selector used to denote pages within the container. Defaults to `.fp-page`.
+pagination | boolean | Whether to show prev/next links. Defaults to true.
+nextText | string | The text for the 'next' page link. Defaults to 'Next'
+prevText | string | The text for the 'next' page link. Defaults to 'Prev'
+onScroll | callback | Optional, called on scroll when an update to check what page is in view is done. In the context of the callback, 'this' is the full object containing options and objects. Console.log the 'this' value to see what it contains.
+onPageChange | callback | Optional, called when the current page is set. In the context of the callback, 'this' is same as above for onScroll.
+activeNavClass | string | The class name used to denote the currently selected navigation item. Defaults to `fp-nav-active`.
+activePageClass | string | The class name used to denote the currently selected page. Defaults to `fp-page-active`.
+duration | int | The time of page scroll transitions, in miliseconds. Defaults to 600.
 
 The second is on the page elements themselves, in the form of attributes:
 
-<table>
-	<tr>
-		<th>id</th>
-		<td>string</td>
-		<td>An ID for the page block. This will also be used for navigation purposes, and will show in the URL as a hash when switching between pages via navigation. If no ID attribute is supplied, the page will be skipped when navigating via the nav or prev/next links and the hash will not be updated.</td>
-	</tr>
-	<tr>
-		<th>data-title</th>
-		<td>string</td>
-		<td>The title that will be used in navigation. If this is not included then the page will not be included in the nav.</td>
-	</tr>
-	<tr>
-		<th>data-background</th>
-		<td>hex string</td>
-		<td>Add a custom colour to the background of this page.</td>
-	</tr>
-	<tr>
-		<th>data-image</th>
-		<td>string</td>
-		<td>The URL to an image that will be used as the background for the page. The image will automatically scale to fill the entire background.</td>
-	</tr>
-</table>
+Attribute | Type | Description
+:-------- | :--- | :----------
+id | string | An ID for the page block. This will also be used for navigation purposes, and will show in the URL as a hash when switching between pages via navigation. If no ID attribute is supplied, the page will be skipped when navigating via the nav or prev/next links and the hash will not be updated.
+data-title | string | The title that will be used in navigation. If this is not included then the page will not be included in the nav.
+data-background | hex string | Add a custom colour to the background of this page.
+data-image | string | The URL to an image that will be used as the background for the page. The image will automatically scale to fill the entire background.
 
 ## To-do
 
