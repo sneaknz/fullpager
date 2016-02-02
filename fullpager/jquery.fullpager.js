@@ -300,8 +300,9 @@
 			var me = this;
 			
 			// J/K and arrow navigation
-
-			if (ev.altKey || ev.ctrlKey || ev.shiftKey || ev.metaKey) {
+			if ( ev.target.tagName.toUpperCase() === 'INPUT' || ev.target.tagName.toUpperCase() === 'TEXTAREA' ) {
+				return;
+			} else if (ev.altKey || ev.ctrlKey || ev.shiftKey || ev.metaKey) {
 				return;
 			} else {
 				switch(ev.which) {

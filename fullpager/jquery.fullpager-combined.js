@@ -6,10 +6,6 @@
 // @codekit-append "../js/jquery.ba-throttle-debounce.js";
 // @codekit-append "../js/jquery.scrollTo.js";
 
-/* **********************************************
-     Begin jquery.fullpager.js
-********************************************** */
-
 /*!
  * Fullpager
  * Mike Harding (@sneak)
@@ -312,8 +308,9 @@
 			var me = this;
 			
 			// J/K and arrow navigation
-
-			if (ev.altKey || ev.ctrlKey || ev.shiftKey || ev.metaKey) {
+			if ( ev.target.tagName.toUpperCase() === 'INPUT' || ev.target.tagName.toUpperCase() === 'TEXTAREA' ) {
+				return;
+			} else if (ev.altKey || ev.ctrlKey || ev.shiftKey || ev.metaKey) {
 				return;
 			} else {
 				switch(ev.which) {
@@ -501,10 +498,6 @@
 	
 
 })(jQuery);
-
-/* **********************************************
-     Begin imagesloaded.js
-********************************************** */
 
 /*!
  * imagesLoaded PACKAGED v3.1.4
@@ -1395,10 +1388,6 @@ function makeArray( obj ) {
 
 });
 
-/* **********************************************
-     Begin jquery.imagefill.js
-********************************************** */
-
 /*!
  * Imagefill
  * Mike Harding (@sneak)
@@ -1519,10 +1508,6 @@ function makeArray( obj ) {
 	
 })(jQuery);
 
-/* **********************************************
-     Begin isInViewport.js
-********************************************** */
-
 /**
  * @author  Mudit Ameta
  * @license https://github.com/zeusdeux/isInViewport/blob/master/license.md MIT
@@ -1595,10 +1580,6 @@ function makeArray( obj ) {
 
 	};
 })(jQuery);
-
-/* **********************************************
-     Begin jquery.ba-throttle-debounce.js
-********************************************** */
 
 /*!
  * jQuery throttle / debounce - v1.1 - 3/7/2010
@@ -1854,10 +1835,6 @@ function makeArray( obj ) {
 })(this);
 
 
-/* **********************************************
-     Begin jquery.scrollTo.js
-********************************************** */
-
 /*!
  * jQuery.ScrollTo
  * Copyright (c) 2007-2013 Ariel Flesler - aflesler<a>gmail<d>com | http://flesler.blogspot.com
@@ -2032,3 +2009,4 @@ function makeArray( obj ) {
 	};
 
 })( jQuery );
+
